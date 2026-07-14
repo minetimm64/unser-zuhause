@@ -6,13 +6,19 @@
 <title>🏠 Unser Zuhause</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;height:100dvh}
+html,body{width:100%;height:100%;height:100dvh;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 body{background:#0A080E;display:flex;justify-content:center;align-items:center;overflow:hidden;position:fixed;inset:0;height:100dvh}
-#g{width:100%;height:100%;display:flex;justify-content:center;align-items:center}
-#g canvas{box-shadow:0 0 80px rgba(80,40,180,0.2),0 0 30px rgba(0,0,0,0.9)}
+#g{width:100%;height:100%;display:flex;justify-content:center;align-items:center;touch-action:none}
+#g canvas{box-shadow:0 0 80px rgba(80,40,180,0.2),0 0 30px rgba(0,0,0,0.9);touch-action:none}
+#rotateOverlay{display:none;position:fixed;inset:0;z-index:9999;background:#0A080E;color:#F0E8FF;flex-direction:column;justify-content:center;align-items:center;text-align:center;font-family:Arial,sans-serif;padding:24px}
+#rotateOverlay .icon{font-size:56px;margin-bottom:18px;animation:rotHint 1.6s ease-in-out infinite}
+#rotateOverlay p{font-size:16px;line-height:1.5;max-width:320px;color:#C8B8E0}
+@keyframes rotHint{0%,100%{transform:rotate(0deg)}50%{transform:rotate(90deg)}}
+@media (orientation:portrait) and (max-width:900px){#rotateOverlay{display:flex}}
 </style>
 </head>
 <body>
+<div id="rotateOverlay"><div class="icon">📱↻</div><p>Bitte dein Handy quer halten (Querformat)<br>für die beste Ansicht 🏠</p></div>
 <div id="g"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
 <script>
@@ -67,6 +73,16 @@ function drawDoorX(g,wx,y0,y1,z1){
   wL(g,0xFFFFFF,wx,y0+0.11,y0+0.30,0.12,z1*0.55,0.18);
   wL(g,0xD8D4CC,wx,y0,y0+0.1,0,z1);wL(g,0xD8D4CC,wx,y1-0.1,y1,0,z1);wL(g,0xD8D4CC,wx,y0,y1,z1-0.1,z1);
   wL(g,0xC8A030,wx,y0+0.12,y0+0.22,0.86,1.04);wL(g,0xE0B840,wx,y0+0.14,y0+0.19,0.87,1.03);
+}
+// Geheime Falltür im Boden (Kellereingang) — Holzluke mit Ringgriff
+function drawTrapdoor(g,wx,wy){
+  const sw=1.3,sd=1.0;
+  hP(g,0x3A2818,wx,wy,wx+sw,wy+sd,0.01);
+  hP(g,0x5A3E22,wx+0.07,wy+0.07,wx+sw-0.07,wy+sd-0.07,0.02);
+  for(let px=wx+0.15;px<wx+sw-0.1;px+=0.24){hP(g,0x4A3018,px,wy+0.1,px+0.2,wy+sd-0.1,0.025,0.5);}
+  const rS=I(wx+sw/2,wy+sd/2,0.03);
+  g.lineStyle(2.5,0xC8A030,0.9);g.strokeCircle(rS.x,rS.y-3,7);
+  g.fillStyle(0x2A1C0E,0.4);g.fillEllipse(rS.x,rS.y+2,26,10);
 }
 // Generic frosted-glass door — fixed Y plane (like a back/front wall)
 function drawDoorY(g,wy,x0,x1,z1){
@@ -125,6 +141,7 @@ const GS={
   room:'schlafzimmer',placements:null,override:null,
   hunger:{katze1:20,katze2:20},                 // 0-100, steigt mit der Zeit
   quests:{active:null,completed:[],lastOffered:{}},
+  kellerUnlocked:false,                         // 🔓 geheimer Keller — per Pflanzen-Klick freischaltbar
   period(){if(this.override)return this.override;const h=new Date().getHours();if(h>=6&&h<11)return'morning';if(h>=11&&h<17)return'afternoon';if(h>=17&&h<22)return'evening';return'night';},
   recalc(){const p=this.period(),res={};Object.entries(SCHED).forEach(([k,s])=>{const e=s[p];let room=e.room,slot=e.slot;if(e.alts&&Math.random()<e.alts[0].w){room=e.alts[0].room;slot=e.alts[0].slot;}if(!res[room])res[room]=[];res[room].push({npc:k,slot});});this.placements=res;},
   tickHunger(amount){
@@ -230,8 +247,9 @@ const ROOMS={
   bad:{label:'Bad',exits:[{to:'schlafzimmer',label:'Schlafzimmer \u25b2'}],slots:{toilet:{wx:1.5,wy:3.5},sink:{wx:4.5,wy:3.0},bath:{wx:7.5,wy:3.5}}},
   flur:{label:'Flur',exits:[{to:'wohnzimmer',label:'Wohnzimmer \u25b2'},{to:'kueche',label:'Kueche \u25b6'}],slots:{center:{wx:2.0,wy:4.5},coat:{wx:1.2,wy:3.0},shoe:{wx:2.3,wy:3.3}}},
   balkon:{label:'Balkon',exits:[{to:'wohnzimmer',label:'\u25bc Wohnzimmer'}],slots:{railing:{wx:2.0,wy:3.5},chair_l:{wx:3.5,wy:4.0},chair_r:{wx:5.0,wy:4.0},plant_a:{wx:7.5,wy:3.5}}},
+  keller:{label:'Keller',exits:[{to:'flur',label:'\u25b2 Flur'}],slots:{center:{wx:4.5,wy:3.5}}},
 };
-const SMAP={schlafzimmer:'Schlafzimmer',wohnzimmer:'Wohnzimmer',kueche:'Kueche',bad:'Bad',flur:'Flur',balkon:'Balkon'};
+const SMAP={schlafzimmer:'Schlafzimmer',wohnzimmer:'Wohnzimmer',kueche:'Kueche',bad:'Bad',flur:'Flur',balkon:'Balkon',keller:'Keller'};
 
 // Tür-basierte Navigation (ersetzt die Buttons) — Layout laut Skizze:
 // Wohnzimmer ↔ Flur + Balkon | Schlafzimmer ↔ Flur + Balkon | Bad/Küche ↔ nur Flur | Flur ↔ alles außer Balkon
@@ -248,7 +266,8 @@ const DOORS={
     {wall:'x0', r0:0.8, r1:2.15, to:'wohnzimmer', label:'Wohnzimmer'},
     {wall:'x0', r0:4.85, r1:6.2, to:'schlafzimmer', label:'Schlafzimmer'},
     {wall:'y7', r0:1.0, r1:2.35, to:'bad', label:'Bad'},
-    {wall:'y0', r0:1.0, r1:2.35, to:'kueche', label:'Küche'}
+    {wall:'y0', r0:1.0, r1:2.35, to:'kueche', label:'Küche'},
+    {trapdoor:true, requires:'kellerUnlocked', wx:3.2, wy:5.2, to:'keller', label:'??? Keller'}
   ],
   bad:[
     {wall:'x9', r0:0.2, r1:1.55, to:'flur', label:'Flur'}
@@ -259,6 +278,9 @@ const DOORS={
   balkon:[
     {wall:'custom', cx:3.0, cy:0, to:'wohnzimmer', label:'Wohnzimmer'},
     {wall:'y0', r0:5.7, r1:7.05, to:'schlafzimmer', label:'Schlafzimmer'}
+  ],
+  keller:[
+    {wall:'y7', r0:3.5, r1:4.85, to:'flur', label:'Flur'}
   ]
 };
 
@@ -458,13 +480,19 @@ class BaseRoom extends Phaser.Scene{
     const list=DOORS[this.roomKey]||[];
     const g=this._roomGfx;
     list.forEach(d=>{
+      if(d.requires&&!GS[d.requires])return; // noch nicht freigeschaltet — unsichtbar & nicht klickbar
       let cx,cy;
-      if(d.wall==='x0'){drawDoorX(g,0,d.r0,d.r1);const c=I(0,(d.r0+d.r1)/2,0.94);cx=c.x;cy=c.y;}
+      if(d.trapdoor){
+        drawTrapdoor(g,d.wx,d.wy);
+        const c=I(d.wx+0.65,d.wy+0.5,0.02);cx=c.x;cy=c.y;
+      }
+      else if(d.wall==='x0'){drawDoorX(g,0,d.r0,d.r1);const c=I(0,(d.r0+d.r1)/2,0.94);cx=c.x;cy=c.y;}
       else if(d.wall==='x9'){drawDoorX(g,9,d.r0,d.r1);const c=I(9,(d.r0+d.r1)/2,0.94);cx=c.x;cy=c.y;}
       else if(d.wall==='y0'){drawDoorY(g,0,d.r0,d.r1);const c=I((d.r0+d.r1)/2,0,0.94);cx=c.x;cy=c.y;}
       else if(d.wall==='y7'){drawDoorY(g,7,d.r0,d.r1);const c=I((d.r0+d.r1)/2,7,0.94);cx=c.x;cy=c.y;}
       else if(d.wall==='custom'){const c=I(d.cx,d.cy,0.94);cx=c.x;cy=c.y;}
-      const zone=this.add.zone(cx,cy,62,92).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(450);
+      const zw=d.trapdoor?70:62,zh=d.trapdoor?50:92;
+      const zone=this.add.zone(cx,cy,zw,zh).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(450);
       let tag=null;
       zone.on('pointerover',()=>{
         if(!tag)tag=this.add.text(cx,cy-42,d.label,{fontSize:'10px',fontFamily:'Arial',color:'#F0E8FF',backgroundColor:'#22164499',padding:{x:5,y:2}}).setOrigin(0.5).setDepth(600);
@@ -763,6 +791,18 @@ class Wohnzimmer extends BaseRoom{
 
     // Pflanze an linker Wand
     const lpl1=I(0,5.5,0);plantAt(g,lpl1.x,lpl1.y,C.PL_M,8);
+
+    // 🔓 Geheimer Auslöser: Klick auf diese Pflanze schaltet den Keller frei
+    const secretZone=this.add.zone(lpl1.x,lpl1.y-16,44,50).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(96);
+    secretZone.on('pointerdown',()=>{
+      this._npcClick=true;
+      if(!GS.kellerUnlocked){
+        GS.kellerUnlocked=true;saveGame();
+        this.openItemMsg(lpl1.x,lpl1.y-40,'Die Pflanze wackelt... etwas hat sich bewegt! \ud83c\udf3f\ud83d\udd11');
+      }else{
+        this.openItemMsg(lpl1.x,lpl1.y-40,'Nur eine ganz normale Pflanze. \ud83c\udf31');
+      }
+    });
   }
 }
 
@@ -913,13 +953,69 @@ class Balkon extends BaseRoom{
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  🔓 GEHEIMER KELLER — nur über die Pflanze im Wohnzimmer erreichbar
+// ═══════════════════════════════════════════════════════════════
+class Keller extends BaseRoom{
+  constructor(){super('Keller','keller');}
+  drawRoom(g){
+    OX=417;OY=147;
+    roomBox(g,0x3A3040,0x483A54,0x241C28);
+    // Steinboden-Textur statt Dielen
+    for(let sy=0.4;sy<7;sy+=0.75){for(let sx=0.3;sx<9;sx+=0.9){
+      const p=I(sx,sy,0);g.fillStyle(0x2C2432,0.35);g.fillRect(p.x-14,p.y-6,26,11);
+    }}
+    // Gedämpftes Deckenlicht — eine einzelne Glühbirne
+    const bulbS=I(4.5,3.2,2.6);
+    g.fillStyle(0xFFE8A0,0.15);g.fillCircle(bulbS.x,bulbS.y+40,130);
+    g.fillStyle(0xFFE8A0,0.28);g.fillCircle(bulbS.x,bulbS.y+40,70);
+    g.lineStyle(2,0x1A1418);g.lineBetween(bulbS.x,bulbS.y-38,bulbS.x,bulbS.y);
+    g.fillStyle(0x282020);g.fillCircle(bulbS.x,bulbS.y,5);
+    g.fillStyle(0xFFEEB0);g.fillCircle(bulbS.x,bulbS.y+10,8);
+
+    // Weinregal an der Rückwand
+    box(g,1.0,0.3,0,3.2,0.5,1.6,0x5A4028,0x4A3420,0x6A5030);
+    for(let wx2=1.15;wx2<4.0;wx2+=0.42){for(let wz=0.25;wz<1.5;wz+=0.42){
+      const bS=I(wx2,0.45,wz);g.fillStyle(0x1A2818);g.fillCircle(bS.x,bS.y,7);
+      g.fillStyle([0x6A2020,0x2A3818,0x3A2818][Math.floor(Math.random()*3)]);g.fillRect(bS.x-3,bS.y-9,6,9);
+    }}
+
+    // Kisten gestapelt
+    box(g,6.2,0.5,0,1.0,1.0,0.7,0x7A5A34,0x6A4A28,0x8A6A40);
+    box(g,6.4,1.6,0,0.9,0.9,0.65,0x7A5A34,0x6A4A28,0x8A6A40);
+    box(g,7.4,0.6,0,0.85,0.85,1.05,0x7A5A34,0x6A4A28,0x8A6A40);
+
+    // Alte Truhe mit leichtem Glanz (kleines Geheimnis-Detail)
+    box(g,1.2,4.5,0,1.3,0.9,0.65,0x4A3420,0x3A2818,0x5A4428);
+    box(g,1.2,4.5,0.65,1.3,0.9,0.12,0x5A4020,0x4A3418,0x6A5030);
+    const chestS=I(1.85,4.95,0.7);
+    g.fillStyle(0xE8C860,0.5);g.fillCircle(chestS.x,chestS.y,10);
+    g.fillStyle(0xFFE890,0.85);g.fillCircle(chestS.x,chestS.y,4);
+
+    // Spinnweben in den Ecken
+    const web=(wx2,wy2,flip)=>{
+      const s=I(wx2,wy2,2.7);const d=flip?-1:1;
+      g.lineStyle(1,0xC8C0D0,0.35);
+      for(let a=0;a<4;a++)g.lineBetween(s.x,s.y,s.x+d*(10+a*7),s.y+8+a*5);
+      g.strokeCircle(s.x+d*10,s.y+9,6);g.strokeCircle(s.x+d*18,s.y+15,11);
+    };
+    web(0.3,0.3,false);web(8.7,0.3,true);
+
+    planks(g,0x2C2432);
+
+    // 🗝️ kleiner Flavor-Text, damit sich der Fund lohnt
+    const signS=I(4.5,5.6,0);
+    this.add.text(signS.x,signS.y,'✨ Unser kleines Geheimnis ✨',{fontSize:'11px',fontFamily:'Arial',color:'#E8D8B8',fontStyle:'italic'}).setOrigin(0.5).setDepth(200);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  SPEICHERSYSTEM — localStorage, pro Browser/Gerät getrennt.
 //  Jeder Freund, der die Datei öffnet, startet automatisch frisch.
 // ═══════════════════════════════════════════════════════════════
 const SAVE_KEY='cozyhome_save_v1';
 function saveGame(){
   try{
-    const data={hunger:GS.hunger,quests:GS.quests,room:GS.room,savedAt:Date.now()};
+    const data={hunger:GS.hunger,quests:GS.quests,room:GS.room,kellerUnlocked:GS.kellerUnlocked,savedAt:Date.now()};
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
   }catch(e){/* localStorage evtl. nicht verfügbar — einfach ignorieren */}
 }
@@ -931,6 +1027,7 @@ function loadGame(){
     if(data.hunger)GS.hunger=data.hunger;
     if(data.quests)GS.quests=data.quests;
     if(data.room)GS.room=data.room;
+    if(data.kellerUnlocked)GS.kellerUnlocked=data.kellerUnlocked;
     return true;
   }catch(e){return false;}
 }
@@ -1066,7 +1163,7 @@ new Phaser.Game({
     expandParent:true,
     fullscreenTarget:'g'
   },
-  scene:[StartScreen,Schlafzimmer,Wohnzimmer,Kueche,Bad,Flur,Balkon,UI]
+  scene:[StartScreen,Schlafzimmer,Wohnzimmer,Kueche,Bad,Flur,Balkon,Keller,UI]
 });
 window.addEventListener('beforeunload',()=>{if(typeof saveGame==='function')saveGame();});
 </script>
