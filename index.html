@@ -222,7 +222,7 @@ const SCHED={
   // 🌆 Abend: ich+Freundin Wohnzimmer (Couch!), Katze1 Wohnzimmer/Balkon, Katze2 Küche/Wohnzimmer
   // 🌙 Nacht: ich+Freundin Schlafzimmer, Katzen verteilt
   ich:{
-    morning:   {room:'kueche',       slot:'stove',    alts:[{room:'balkon',slot: 'railing',w:.35}]},
+    morning:   {room:'kueche',       slot:'stove',    alts:[{room:'balkon',slot: 'railing',w:.4}]},
     afternoon: {room:'wohnzimmer',   slot:'couch_l',  alts:[{room:'balkon',slot:'chair_l',w:.4}]},
     evening:   {room:'wohnzimmer',   slot:'couch_l',  alts:[{room:'kueche',slot:'stove',w:.15}]},
     night:     {room:'schlafzimmer', slot:'bed_ich'},
@@ -397,7 +397,7 @@ const ITEMS={
     {wx:8.3,wy:5.3,questId:'feed_katze2',label:'Napf (Felino)',doneText:'Der Napf ist schon gef\u00fcllt.'},
   ],
   schlafzimmer:[
-    {wx:0.8,wy:6.3,questId:'staubsaugen',spriteKey:'staubsauger',label:'Staubsauger',doneText:'Gerade blitzeblank, nichts zu saugen.'},
+    {wx:0.8,wy:6.8,questId:'staubsaugen',spriteKey:'staubsauger',label:'Staubsauger',doneText:'Gerade blitzeblank, nichts zu saugen.'},
   ],
 };
 
@@ -982,14 +982,45 @@ class Balkon extends BaseRoom{
   constructor(){super('Balkon','balkon');}
   drawRoom(g){
     OX=417;OY=147;
-    g.fillStyle(C.BL_SK1);g.fillRect(0,0,GW,140);g.fillStyle(C.BL_SK2);g.fillRect(0,140,GW,140);g.fillStyle(C.BL_SK3);g.fillRect(0,280,GW,143);
-    const cloud=(x,y,w)=>{g.fillStyle(0xF4F8FC,0.84);g.fillRect(x,y,w,20);g.fillRect(x-8,y+6,w+17,15);g.fillRect(x+11,y-7,w-22,17);};
-    cloud(59,31,101);cloud(371,49,134);cloud(577,21,106);
-    g.fillStyle(0x8898A8,0.3);g.fillRect(0,123,78,297);g.fillRect(56,98,120,322);g.fillRect(490,101,109,319);g.fillRect(588,77,87,343);
-    g.fillStyle(0xF0E8C0,0.33);for(let by=109;by<280;by+=25)for(let bx=62;bx<171;bx+=28)g.fillRect(bx,by,13,17);for(let by=92;by<280;by+=25)for(let bx=497;bx<602;bx+=28)g.fillRect(bx,by,13,17);
-    g.fillStyle(0x408050,0.42);g.fillRect(0,224,59,196);g.fillRect(613,217,56,203);
-    fp(g,C.BL_WL,[I(0,0,0),I(9,0,0),I(9,0,3),I(0,0,3)]);fp(g,C.BL_WL,[I(0,0,0),I(0,7,0),I(0,7,3),I(0,0,3)]);fp(g,C.BL_FL,[I(0,0,0),I(9,0,0),I(9,7,0),I(0,7,0)]);planks(g,0xB0A898);
-    box(g,0,6.8,0.82,9,0.2,0.08,C.BL_RL,C.BL_RL,0xECE8C8);box(g,0,6.8,0.32,9,0.2,0.08,C.BL_RL,C.BL_RL,0xECE8C8);box(g,0,6.8,0,9,0.2,0.34,C.BL_RL,C.BL_RL,0xECE8C8);
+    const period=GS.period();
+    const isNight=period==='night';
+    const isEvening=period==='evening';
+    // Himmelsfarben je nach Tageszeit
+    let sk1,sk2,sk3,windowLit,windowOff,cloudCol,cloudA;
+    if(isNight){
+      sk1=0x0C1428;sk2=0x18223C;sk3=0x28304C;
+      windowLit=0xF0D060;windowOff=0x141824;cloudA=0;
+    }else if(isEvening){
+      sk1=0xE86840;sk2=0xF0986C;sk3=0xF8C89C;
+      windowLit=0xFFE090;windowOff=0x8878A0;cloudA=0.55;cloudCol=0xFFC8A0;
+    }else{
+      sk1=C.BL_SK1;sk2=C.BL_SK2;sk3=C.BL_SK3;
+      windowLit=0xF0E8C0;windowOff=0xF0E8C0;cloudA=0.84;cloudCol=0xF4F8FC;
+    }
+    g.fillStyle(sk1);g.fillRect(0,0,GW,140);g.fillStyle(sk2);g.fillRect(0,140,GW,140);g.fillStyle(sk3);g.fillRect(0,280,GW,143);
+    if(isNight){
+      // Sterne + Mond statt Wolken
+      for(let i=0;i<40;i++){
+        const sx2=(i*67+13)%GW,sy2=(i*41+7)%260;
+        g.fillStyle(0xF8F8FF,0.35+0.4*((i*7)%3)/3);g.fillRect(sx2,sy2,2,2);
+      }
+      g.fillStyle(0xF0EAD8,0.9);g.fillCircle(560,60,26);
+      g.fillStyle(0x0C1428,0.5);g.fillCircle(572,52,24); // Mondsichel-Schatten
+    }else{
+      const cloud=(x,y,w)=>{g.fillStyle(cloudCol,cloudA);g.fillRect(x,y,w,20);g.fillRect(x-8,y+6,w+17,15);g.fillRect(x+11,y-7,w-22,17);};
+      cloud(59,31,101);cloud(371,49,134);cloud(577,21,106);
+    }
+    g.fillStyle(0x8898A8,isNight?0.55:0.3);g.fillRect(0,123,78,297);g.fillRect(56,98,120,322);g.fillRect(490,101,109,319);g.fillRect(588,77,87,343);
+    // Gebäudefenster — nachts unterschiedlich hell erleuchtet, sonst einheitlich
+    const winSeed=(bx,by)=>((bx*13+by*7)%5);
+    g.fillStyle(windowLit,isNight?0.95:0.33);for(let by=109;by<280;by+=25)for(let bx=62;bx<171;bx+=28){if(!isNight||winSeed(bx,by)>1)g.fillRect(bx,by,13,17);else{g.fillStyle(windowOff,0.5);g.fillRect(bx,by,13,17);g.fillStyle(windowLit,0.95);}}
+    for(let by=92;by<280;by+=25)for(let bx=497;bx<602;bx+=28){if(!isNight||winSeed(bx,by)>1)g.fillRect(bx,by,13,17);else{g.fillStyle(windowOff,0.5);g.fillRect(bx,by,13,17);g.fillStyle(windowLit,0.95);}}
+    g.fillStyle(0x408050,isNight?0.6:0.42);g.fillRect(0,224,59,196);g.fillRect(613,217,56,203);
+    const wlC=isNight?0x585458:(isEvening?0xD8A888:C.BL_WL);
+    const flC=isNight?0x807868:(isEvening?0xC0A080:C.BL_FL);
+    const rlC=isNight?0x8A7860:(isEvening?0xC8A868:C.BL_RL);
+    fp(g,wlC,[I(0,0,0),I(9,0,0),I(9,0,3),I(0,0,3)]);fp(g,wlC,[I(0,0,0),I(0,7,0),I(0,7,3),I(0,0,3)]);fp(g,flC,[I(0,0,0),I(9,0,0),I(9,7,0),I(0,7,0)]);planks(g,isNight?0x706858:0xB0A898);
+    box(g,0,6.8,0.82,9,0.2,0.08,rlC,rlC,0xECE8C8);box(g,0,6.8,0.32,9,0.2,0.08,rlC,rlC,0xECE8C8);box(g,0,6.8,0,9,0.2,0.34,rlC,rlC,0xECE8C8);
     for(let bx=0.3;bx<9;bx+=0.6)box(g,bx,6.8,0.08,0.1,0.2,0.74,0xCCC888,0xBCB878,0xDDD898);
     wB(g,0x90C0D8,0,1.5,4.5,0,2.82,0.44);wB(g,0xB0B088,0,1.5,1.62,0,2.82);wB(g,0xB0B088,0,4.38,4.5,0,2.82);wB(g,0xB0B088,0,1.5,4.5,2.76,2.84);
     box(g,3.5,3.5,0,1.5,1.5,0.08,0xD8D090,0xC8C080,0xE8E0A0);box(g,4.1,4.4,0,0.15,0.15,0.9,0xC0B870,0xB0A860,0xD0C880);
