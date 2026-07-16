@@ -222,7 +222,7 @@ const SCHED={
   // 🌆 Abend: ich+Freundin Wohnzimmer (Couch!), Katze1 Wohnzimmer/Balkon, Katze2 Küche/Wohnzimmer
   // 🌙 Nacht: ich+Freundin Schlafzimmer, Katzen verteilt
   ich:{
-    morning:   {room:'kueche',       slot:'stove',    alts:[{room:'balkon',slot: 'railing',w:.4}]},
+    morning:   {room:'kueche',       slot:'stove',    alts:[{room:'balkon',slot: 'railing',w:.35}]},
     afternoon: {room:'wohnzimmer',   slot:'couch_l',  alts:[{room:'balkon',slot:'chair_l',w:.4}]},
     evening:   {room:'wohnzimmer',   slot:'couch_l',  alts:[{room:'kueche',slot:'stove',w:.15}]},
     night:     {room:'schlafzimmer', slot:'bed_ich'},
@@ -623,7 +623,10 @@ class BaseRoom extends Phaser.Scene{
         if(!img.active)return; // Szene/Sprite wurde beim Raumwechsel schon zerstört
         idx=(idx+1)%SMOKE_SEQ.length;
         applyFrame();
-        this.time.delayedCall(SMOKE_MS[idx],advance);
+        // Nach einem vollen Zyklus (zurück bei idx=0) längere Pause, statt sofort
+        // wieder zu ziehen — wirkt natürlicher, kein Dauer-Rauchen
+        const delay=idx===0?5000:SMOKE_MS[idx];
+        this.time.delayedCall(delay,advance);
       };
       this.time.delayedCall(SMOKE_MS[idx],advance);
     }else{
