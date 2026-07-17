@@ -244,9 +244,11 @@ const ROOMS={
   flur:{label:'Flur',exits:[{to:'wohnzimmer',label:'Wohnzimmer \u25b2'},{to:'kueche',label:'Kueche \u25b6'}],slots:{center:{wx:2.0,wy:4.5},coat:{wx:1.2,wy:3.0},shoe:{wx:2.3,wy:3.3}}},
   balkon:{label:'Balkon',exits:[{to:'wohnzimmer',label:'\u25bc Wohnzimmer'}],slots:{railing:{wx:2.3,wy:6.1},chair_l:{wx:3.7,wy:4.5},chair_r:{wx:5.0,wy:4.0},plant_a:{wx:7.5,wy:3.5}}},
   keller:{label:'Keller',exits:[{to:'flur',label:'\u25b2 Flur'}],slots:{center:{wx:4.5,wy:3.5}}},
-  supermarkt:{label:'Supermarkt',exits:[{to:'flur',label:'\u25c4 Nach Hause'}],slots:{}},
+  markt1:{label:'Obst & Gem\u00fcse',exits:[{to:'flur',label:'\u25c4 Nach Hause'},{to:'markt2',label:'K\u00fchlregal \u25b6'}],slots:{}},
+  markt2:{label:'K\u00fchl & Vorrat',exits:[{to:'markt1',label:'\u25c4 Obst & Gem\u00fcse'},{to:'markt3',label:'Getr\u00e4nke \u25b6'}],slots:{}},
+  markt3:{label:'Getr\u00e4nke & S\u00fc\u00dfes',exits:[{to:'markt2',label:'\u25c4 K\u00fchl & Vorrat'},{to:'flur',label:'Kasse \u2192 Nach Hause'}],slots:{}},
 };
-const SMAP={schlafzimmer:'Schlafzimmer',wohnzimmer:'Wohnzimmer',kueche:'Kueche',bad:'Bad',flur:'Flur',balkon:'Balkon',keller:'Keller',supermarkt:'Supermarkt'};
+const SMAP={schlafzimmer:'Schlafzimmer',wohnzimmer:'Wohnzimmer',kueche:'Kueche',bad:'Bad',flur:'Flur',balkon:'Balkon',keller:'Keller',markt1:'Markt1',markt2:'Markt2',markt3:'Markt3'};
 
 // Tür-basierte Navigation (ersetzt die Buttons) — Layout laut Skizze:
 // Wohnzimmer ↔ Flur + Balkon | Schlafzimmer ↔ Flur + Balkon | Bad/Küche ↔ nur Flur | Flur ↔ alles außer Balkon
@@ -265,7 +267,7 @@ const DOORS={
     {wall:'y7', r0:1.0, r1:2.35, to:'bad', label:'Bad'},
     {wall:'y0', r0:1.0, r1:2.35, to:'kueche', label:'Küche'},
     {trapdoor:true, requires:'kellerUnlocked', wx:3.2, wy:5.2, to:'keller', label:'??? Keller'},
-    {wall:'x9', r0:0.5, r1:1.85, to:'supermarkt', label:'Haustür 🚪'}
+    {wall:'x9', r0:0.5, r1:1.85, to:'markt1', label:'Haustür 🚪'}
   ],
   bad:[
     {wall:'x9', r0:0.2, r1:1.55, to:'flur', label:'Flur'}
@@ -280,8 +282,17 @@ const DOORS={
   keller:[
     {wall:'y7', r0:3.5, r1:4.85, to:'flur', label:'Flur'}
   ],
-  supermarkt:[
-    {wall:'y7', r0:3.5, r1:4.85, to:'flur', label:'Nach Hause'}
+  markt1:[
+    {wall:'y7', r0:0.5, r1:1.85, to:'flur', label:'Nach Hause'},
+    {wall:'x9', r0:2.6, r1:3.95, to:'markt2', label:'Kühlregal'}
+  ],
+  markt2:[
+    {wall:'x0', r0:2.6, r1:3.95, to:'markt1', label:'Obst & Gemüse'},
+    {wall:'x9', r0:2.6, r1:3.95, to:'markt3', label:'Getränke'}
+  ],
+  markt3:[
+    {wall:'x0', r0:2.6, r1:3.95, to:'markt2', label:'Kühl & Vorrat'},
+    {wall:'y7', r0:5.0, r1:6.35, to:'flur', label:'Kasse → Nach Hause'}
   ]
 };
 
@@ -355,32 +366,41 @@ class Quest{
 
 // 💡 Neue Quests hier registrieren — einfach ein neues Quest-Objekt hinzufügen!
 // 🛒 Lebensmittel-Pool für die Einkaufsliste — 50 Stück, Emoji statt eigenem Sprite
+// Abteilungen — für die spätere Deko/eigene Sprites einfach hier ansetzen
+const DEPARTMENTS={
+  obst:     {label:'Obst & Gemüse',   icon:'🍎', color:0x6AAA50},
+  kuehl:    {label:'Kühlregal',        icon:'🥛', color:0x60A0C8},
+  vorrat:   {label:'Vorrat & Backwaren',icon:'🥫', color:0xC89050},
+  getraenke:{label:'Getränke',         icon:'🥤', color:0x8060C0},
+  suess:    {label:'Süßes & Snacks',   icon:'🍫', color:0xC85A70},
+};
 const GROCERY_ITEMS=[
-  {id:'milch',icon:'🥛',name:'Milch'},{id:'eier',icon:'🥚',name:'Eier'},
-  {id:'brot',icon:'🍞',name:'Brot'},{id:'butter',icon:'🧈',name:'Butter'},
-  {id:'kaese',icon:'🧀',name:'Käse'},{id:'joghurt',icon:'🥣',name:'Joghurt'},
-  {id:'aepfel',icon:'🍎',name:'Äpfel'},{id:'bananen',icon:'🍌',name:'Bananen'},
-  {id:'tomaten',icon:'🍅',name:'Tomaten'},{id:'gurke',icon:'🥒',name:'Gurke'},
-  {id:'kartoffeln',icon:'🥔',name:'Kartoffeln'},{id:'zwiebeln',icon:'🧅',name:'Zwiebeln'},
-  {id:'karotten',icon:'🥕',name:'Karotten'},{id:'paprika',icon:'🫑',name:'Paprika'},
-  {id:'salat',icon:'🥬',name:'Salat'},{id:'zitronen',icon:'🍋',name:'Zitronen'},
-  {id:'orangen',icon:'🍊',name:'Orangen'},{id:'trauben',icon:'🍇',name:'Trauben'},
-  {id:'erdbeeren',icon:'🍓',name:'Erdbeeren'},{id:'avocado',icon:'🥑',name:'Avocado'},
-  {id:'huehnchen',icon:'🍗',name:'Hähnchen'},{id:'hack',icon:'🥩',name:'Hackfleisch'},
-  {id:'lachs',icon:'🐟',name:'Lachs'},{id:'nudeln',icon:'🍝',name:'Nudeln'},
-  {id:'reis',icon:'🍚',name:'Reis'},{id:'mehl',icon:'🌾',name:'Mehl'},
-  {id:'zucker',icon:'🧂',name:'Zucker'},{id:'salz',icon:'🧂',name:'Salz'},
-  {id:'oel',icon:'🫒',name:'Öl'},{id:'ketchup',icon:'🍅',name:'Ketchup'},
-  {id:'senf',icon:'🌭',name:'Senf'},{id:'honig',icon:'🍯',name:'Honig'},
-  {id:'marmelade',icon:'🍓',name:'Marmelade'},{id:'muesli',icon:'🥣',name:'Müsli'},
-  {id:'kaffee',icon:'☕',name:'Kaffee'},{id:'tee',icon:'🍵',name:'Tee'},
-  {id:'saft',icon:'🧃',name:'Orangensaft'},{id:'cola',icon:'🥤',name:'Cola'},
-  {id:'bier',icon:'🍺',name:'Bier'},{id:'wein',icon:'🍷',name:'Wein'},
-  {id:'wasser',icon:'💧',name:'Wasser'},{id:'schokolade',icon:'🍫',name:'Schokolade'},
-  {id:'kekse',icon:'🍪',name:'Kekse'},{id:'chips',icon:'🥔',name:'Chips'},
-  {id:'eis',icon:'🍦',name:'Eis'},{id:'pizza',icon:'🍕',name:'Tiefkühlpizza'},
-  {id:'wuerstchen',icon:'🌭',name:'Würstchen'},{id:'spinat',icon:'🥬',name:'Spinat'},
-  {id:'pilze',icon:'🍄',name:'Pilze'},{id:'knoblauch',icon:'🧄',name:'Knoblauch'},
+  {id:'milch',icon:'🥛',name:'Milch',cat:'kuehl'},{id:'eier',icon:'🥚',name:'Eier',cat:'kuehl'},
+  {id:'brot',icon:'🍞',name:'Brot',cat:'vorrat'},{id:'butter',icon:'🧈',name:'Butter',cat:'kuehl'},
+  {id:'kaese',icon:'🧀',name:'Käse',cat:'kuehl'},{id:'joghurt',icon:'🥣',name:'Joghurt',cat:'kuehl'},
+  {id:'aepfel',icon:'🍎',name:'Äpfel',cat:'obst'},{id:'bananen',icon:'🍌',name:'Bananen',cat:'obst'},
+  {id:'tomaten',icon:'🍅',name:'Tomaten',cat:'obst'},{id:'gurke',icon:'🥒',name:'Gurke',cat:'obst'},
+  {id:'kartoffeln',icon:'🥔',name:'Kartoffeln',cat:'obst'},{id:'zwiebeln',icon:'🧅',name:'Zwiebeln',cat:'obst'},
+  {id:'karotten',icon:'🥕',name:'Karotten',cat:'obst'},{id:'paprika',icon:'🫑',name:'Paprika',cat:'obst'},
+  {id:'salat',icon:'🥬',name:'Salat',cat:'obst'},{id:'zitronen',icon:'🍋',name:'Zitronen',cat:'obst'},
+  {id:'orangen',icon:'🍊',name:'Orangen',cat:'obst'},{id:'trauben',icon:'🍇',name:'Trauben',cat:'obst'},
+  {id:'erdbeeren',icon:'🍓',name:'Erdbeeren',cat:'obst'},{id:'avocado',icon:'🥑',name:'Avocado',cat:'obst'},
+  {id:'huehnchen',icon:'🍗',name:'Hähnchen',cat:'kuehl'},{id:'hack',icon:'🥩',name:'Hackfleisch',cat:'kuehl'},
+  {id:'lachs',icon:'🐟',name:'Lachs',cat:'kuehl'},{id:'nudeln',icon:'🍝',name:'Nudeln',cat:'vorrat'},
+  {id:'reis',icon:'🍚',name:'Reis',cat:'vorrat'},{id:'mehl',icon:'🌾',name:'Mehl',cat:'vorrat'},
+  {id:'zucker',icon:'🧂',name:'Zucker',cat:'vorrat'},{id:'salz',icon:'🧂',name:'Salz',cat:'vorrat'},
+  {id:'oel',icon:'🫒',name:'Öl',cat:'vorrat'},{id:'ketchup',icon:'🍅',name:'Ketchup',cat:'vorrat'},
+  {id:'senf',icon:'🌭',name:'Senf',cat:'vorrat'},{id:'honig',icon:'🍯',name:'Honig',cat:'vorrat'},
+  {id:'marmelade',icon:'🍓',name:'Marmelade',cat:'vorrat'},{id:'muesli',icon:'🥣',name:'Müsli',cat:'vorrat'},
+  {id:'kaffee',icon:'☕',name:'Kaffee',cat:'getraenke'},{id:'tee',icon:'🍵',name:'Tee',cat:'getraenke'},
+  {id:'saft',icon:'🧃',name:'Orangensaft',cat:'getraenke'},{id:'cola',icon:'🥤',name:'Cola',cat:'getraenke'},
+  {id:'bier',icon:'🍺',name:'Bier',cat:'getraenke'},{id:'wein',icon:'🍷',name:'Wein',cat:'getraenke'},
+  {id:'wasser',icon:'💧',name:'Wasser',cat:'getraenke'},{id:'schokolade',icon:'🍫',name:'Schokolade',cat:'suess'},
+  {id:'kekse',icon:'🍪',name:'Kekse',cat:'suess'},{id:'chips',icon:'🥔',name:'Chips',cat:'suess'},
+  {id:'eis',icon:'🍦',name:'Eis',cat:'suess'},{id:'pizza',icon:'🍕',name:'Tiefkühlpizza',cat:'kuehl'},
+  {id:'wuerstchen',icon:'🌭',name:'Würstchen',cat:'kuehl'},{id:'spinat',icon:'🥬',name:'Spinat',cat:'obst'},
+  {id:'pilze',icon:'🍄',name:'Pilze',cat:'obst'},{id:'knoblauch',icon:'🧄',name:'Knoblauch',cat:'obst'},
+
 ];
 
 // 🛒 Zufällige Einkaufsliste erzeugen (4-8 Items aus dem Pool)
@@ -1143,77 +1163,138 @@ class Keller extends BaseRoom{
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  🛒 SUPERMARKT — Regal-Grid mit allen 50 Artikeln, anklickbar.
-//  Auf der Einkaufsliste stehende Artikel wandern per Klick in den
-//  Wagen; an der Kasse wird abgerechnet und die Quest abgeschlossen.
+//  🛒 SUPERMARKT — 3 begehbare Räume wie der Rest der Wohnung.
+//  Artikel stehen an festen Positionen auf Regalen (wie Möbelstücke).
+//  Noch kein eigenes Sprite generiert? Kein Problem — automatischer
+//  Emoji-Platzhalter, bis ein Sprite mit Key 'grocery_<id>' geladen ist.
 // ═══════════════════════════════════════════════════════════════
-class Supermarkt extends BaseRoom{
-  constructor(){super('Supermarkt','supermarkt');}
+
+// Einfaches Holzregal (2 Ebenen) über die volle Zeilenbreite
+function drawShelfRow(g,wx0,wy,wLen,tiers=2){
+  box(g,wx0,wy,0,wLen,0.5,0.9,0x8A6840,0x7A5830,0x9A7850);
+  for(let t=1;t<tiers;t++)box(g,wx0,wy,0.35*t+0.35,wLen,0.5,0.06,0x6A4A28,0x6A4A28,0x6A4A28);
+}
+
+// Artikel auf festen Iso-Positionen platzieren — Klick sammelt sie ein,
+// falls sie auf der Einkaufsliste stehen. Automatischer Sprite/Emoji-Fallback.
+function placeGroceryItems(scene,items,positions){
+  items.forEach((item,i)=>{
+    const pos=positions[i];
+    if(!pos)return;
+    const sc=I(pos.wx,pos.wy,0.55);
+    const onList=GS.shoppingList.includes(item.id);
+    const inCart=GS.cart.includes(item.id);
+    const spriteKey='grocery_'+item.id;
+    const depth=pos.wx+pos.wy+50;
+    if(loadedSprites.has(spriteKey)){
+      const img=scene.add.image(sc.x,sc.y,spriteKey).setOrigin(0.5,1).setDepth(depth);
+      img.setScale((SPRITE_TARGET_H[spriteKey]||44)/img.height);
+      if(inCart)img.setAlpha(0.4);
+    }else{
+      const bw=38,bh=38;
+      const bg=scene.add.graphics().setDepth(depth);
+      if(inCart){bg.fillStyle(0x8AAA80,0.55);bg.lineStyle(1.5,0x4A7A3A,0.8);}
+      else if(onList){bg.fillStyle(0xFFF4C8,0.95);bg.lineStyle(1.5,0xE0A830,1);}
+      else{bg.fillStyle(0xFFFFFF,0.55);bg.lineStyle(1,0xC8C0B0,0.7);}
+      bg.fillRoundedRect(sc.x-bw/2,sc.y-bh,bw,bh,6);
+      bg.strokeRoundedRect(sc.x-bw/2,sc.y-bh,bw,bh,6);
+      scene.add.text(sc.x,sc.y-bh+15,item.icon,{fontSize:'17px'}).setOrigin(0.5).setDepth(depth+1);
+      if(inCart)scene.add.text(sc.x+13,sc.y-bh+3,'✓',{fontSize:'11px',fontFamily:'Arial',fontStyle:'bold',color:'#2A6A1A'}).setOrigin(0.5).setDepth(depth+2);
+    }
+    scene.add.text(sc.x,sc.y+3,item.name,{fontSize:'8px',fontFamily:'Arial',color:'#2A2018',backgroundColor:'#FFFFFFB0',padding:{x:2,y:1}}).setOrigin(0.5,0).setDepth(depth+2);
+    const zone=scene.add.zone(sc.x,sc.y-18,44,54).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(depth+5);
+    zone.on('pointerdown',()=>{
+      scene._npcClick=true;
+      if(scene.activeDialog)scene.closeDialog();
+      if(!onList){scene.openItemMsg(sc.x,sc.y-62,'Brauchen wir gerade nicht.');return;}
+      if(inCart){scene.openItemMsg(sc.x,sc.y-62,'Schon im Wagen! ✓');return;}
+      GS.cart=[...GS.cart,item.id];
+      saveGame();
+      scene.scene.restart(); // Regal mit neuem Zustand neu zeichnen
+    });
+  });
+}
+
+// Grid-Positionen für eine feste Anzahl Reihen/Spalten erzeugen
+function groceryGridPositions(rows,cols){
+  const pos=[];
+  const wxs=[1.0,2.3,3.6,4.9,6.2,7.5].slice(0,cols);
+  const wys=rows===2?[1.6,3.8]:rows===3?[1.2,2.8,4.4]:[1.0,2.3,3.6,4.9];
+  wys.forEach(wy=>wxs.forEach(wx=>pos.push({wx,wy})));
+  return pos;
+}
+
+// Kassentheke — schließt die Einkaufs-Quest ab, sobald der Wagen komplett ist
+function placeCheckout(scene,g,wx,wy){
+  box(g,wx,wy,0,1.6,0.7,0.85,0x3A2818,0x2A1C10,0x4A3420);
+  box(g,wx+0.15,wy-0.35,0.85,1.3,0.15,0.5,0x2A2020,0x2A2020,0x3A3030);
+  const sc=I(wx+0.8,wy+0.35,0.85);
+  scene.add.text(sc.x,sc.y-14,'💳',{fontSize:'20px'}).setOrigin(0.5).setDepth(wx+wy+60);
+  scene.add.text(sc.x,sc.y+8,'KASSE',{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:'#F0E0C0',backgroundColor:'#3A2818C0',padding:{x:4,y:2}}).setOrigin(0.5).setDepth(wx+wy+60);
+  const zone=scene.add.zone(sc.x,sc.y-10,80,70).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(wx+wy+65);
+  zone.on('pointerdown',()=>{
+    scene._npcClick=true;
+    if(scene.activeDialog)scene.closeDialog();
+    if(!GS.shoppingList.length){scene.openItemMsg(sc.x,sc.y-40,'Gerade nichts zum Abrechnen.');return;}
+    const missing=GS.shoppingList.filter(id=>!GS.cart.includes(id));
+    if(missing.length){
+      const names=missing.map(id=>groceryById(id)?.name).join(', ');
+      scene.openItemMsg(sc.x,sc.y-40,`Es fehlt noch: ${names}`);
+      return;
+    }
+    const quest=QUESTS.einkaufen;
+    if(GS.quests.active==='einkaufen')quest.complete(GS);
+    else{GS.shoppingList=[];GS.cart=[];saveGame();}
+    scene.openItemMsg(sc.x,sc.y-40,quest.rewardText);
+    scene.time.delayedCall(1800,()=>{
+      scene.cameras.main.fadeOut(200,10,8,18);
+      scene.cameras.main.once('camerafadeoutcomplete',()=>{GS.room='flur';scene.scene.start(SMAP['flur']);});
+    });
+  });
+}
+
+// Helle Laden-Wände/-Boden (Basis für alle 3 Markt-Räume)
+function drawMarketShell(g){
+  OX=417;OY=147;
+  roomBox(g,0xEDEAE2,0xF5F2EA,0xDDD8CC);
+  planks(g,0xE0DACC);
+}
+
+class Markt1 extends BaseRoom{
+  constructor(){super('Markt1','markt1');}
   drawRoom(g){
-    OX=417;OY=147;
-    // Einfacher heller Laden-Hintergrund (Fliesenboden, helle Wände)
-    g.fillStyle(0xE8E4DC);g.fillRect(0,0,GW,GH);
-    for(let ty=95;ty<GH;ty+=36){g.lineStyle(1,0xD0CAC0,0.6);g.lineBetween(0,ty,GW,ty);}
-    for(let tx=0;tx<GW;tx+=36){g.lineStyle(1,0xD0CAC0,0.4);g.lineBetween(tx,95,tx,GH);}
-    this.add.text(GW/2,58,'🛒 SUPERMARKT',{fontSize:'20px',fontFamily:'Arial Black, Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(50);
-
-    // --- Regal-Grid: 10 Spalten × 5 Reihen = 50 Artikel ---
-    const cols=10,startX=48,startY=104,cellW=81,cellH=68;
-    GROCERY_ITEMS.forEach((item,i)=>{
-      const col=i%cols,row=Math.floor(i/cols);
-      const cx=startX+col*cellW+cellW/2,cy=startY+row*cellH+cellH/2;
-      const onList=GS.shoppingList.includes(item.id);
-      const inCart=GS.cart.includes(item.id);
-      const box=this.add.graphics().setDepth(40);
-      if(inCart){box.fillStyle(0x8AAA80,0.9);box.lineStyle(2,0x4A7A3A,1);}
-      else if(onList){box.fillStyle(0xFFF4C8,0.95);box.lineStyle(2,0xE0A830,1);}
-      else{box.fillStyle(0xFFFFFF,0.75);box.lineStyle(1,0xC8C0B0,0.8);}
-      box.fillRoundedRect(cx-cellW/2+4,cy-cellH/2+4,cellW-8,cellH-8,7);
-      box.strokeRoundedRect(cx-cellW/2+4,cy-cellH/2+4,cellW-8,cellH-8,7);
-      this.add.text(cx,cy-11,item.icon,{fontSize:'20px'}).setOrigin(0.5).setDepth(41);
-      this.add.text(cx,cy+13,item.name,{fontSize:'9px',fontFamily:'Arial',color:'#2A2018'}).setOrigin(0.5).setDepth(41);
-      if(inCart)this.add.text(cx+22,cy-18,'✓',{fontSize:'13px',fontFamily:'Arial',fontStyle:'bold',color:'#2A6A1A'}).setOrigin(0.5).setDepth(42);
-      const zone=this.add.zone(cx,cy,cellW-6,cellH-6).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(45);
-      zone.on('pointerdown',()=>{
-        this._npcClick=true;
-        if(this.activeDialog)this.closeDialog();
-        if(!onList){this.openItemMsg(cx,cy-30,'Brauchen wir gerade nicht.');return;}
-        if(inCart){this.openItemMsg(cx,cy-30,'Schon im Wagen! ✓');return;}
-        GS.cart=[...GS.cart,item.id];
-        saveGame();
-        this.scene.restart(); // Grid mit neuem Zustand neu zeichnen
-      });
-    });
-
-    // --- Kasse ---
-    const coY=GH-28;
-    const coBg=this.add.graphics().setDepth(40);
-    coBg.fillStyle(0x3A2818,0.92);coBg.fillRoundedRect(GW/2-110,coY-20,220,40,8);
-    coBg.lineStyle(2,0xC89050,1);coBg.strokeRoundedRect(GW/2-110,coY-20,220,40,8);
-    this.add.text(GW/2,coY,'💳 KASSE',{fontSize:'15px',fontFamily:'Arial Black, Arial',fontStyle:'bold',color:'#F0E0C0'}).setOrigin(0.5).setDepth(41);
-    const coZone=this.add.zone(GW/2,coY,220,40).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(45);
-    coZone.on('pointerdown',()=>{
-      this._npcClick=true;
-      if(this.activeDialog)this.closeDialog();
-      if(!GS.shoppingList.length){
-        this.openItemMsg(GW/2,coY-30,'Gerade nichts zum Abrechnen.');
-        return;
-      }
-      const missing=GS.shoppingList.filter(id=>!GS.cart.includes(id));
-      if(missing.length){
-        const names=missing.map(id=>groceryById(id)?.name).join(', ');
-        this.openItemMsg(GW/2,coY-30,`Es fehlt noch: ${names}`);
-        return;
-      }
-      const quest=QUESTS.einkaufen;
-      if(GS.quests.active==='einkaufen')quest.complete(GS);
-      else{GS.shoppingList=[];GS.cart=[];saveGame();}
-      this.openItemMsg(GW/2,coY-30,quest.rewardText);
-      this.time.delayedCall(1800,()=>{
-        this.cameras.main.fadeOut(200,10,8,18);
-        this.cameras.main.once('camerafadeoutcomplete',()=>{GS.room='flur';this.scene.start(SMAP['flur']);});
-      });
-    });
+    drawMarketShell(g);
+    this.add.text(GW/2,26,'🍎 Obst & Gemüse',{fontSize:'15px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(300);
+    drawShelfRow(g,0.7,1.2,7.1,2);
+    drawShelfRow(g,0.7,2.8,7.1,2);
+    drawShelfRow(g,0.7,4.4,7.1,2);
+    const items=GROCERY_ITEMS.filter(i=>i.cat==='obst');
+    placeGroceryItems(this,items,groceryGridPositions(3,6));
+  }
+}
+class Markt2 extends BaseRoom{
+  constructor(){super('Markt2','markt2');}
+  drawRoom(g){
+    drawMarketShell(g);
+    this.add.text(GW/2,26,'🥛 Kühlregal & Vorrat',{fontSize:'15px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(300);
+    drawShelfRow(g,0.7,1.0,7.1,2);
+    drawShelfRow(g,0.7,2.3,7.1,2);
+    drawShelfRow(g,0.7,3.6,7.1,2);
+    drawShelfRow(g,0.7,4.9,7.1,2);
+    const items=GROCERY_ITEMS.filter(i=>i.cat==='kuehl'||i.cat==='vorrat');
+    placeGroceryItems(this,items,groceryGridPositions(4,6));
+  }
+}
+class Markt3 extends BaseRoom{
+  constructor(){super('Markt3','markt3');}
+  drawRoom(g){
+    drawMarketShell(g);
+    this.add.text(GW/2,26,'🥤 Getränke & Süßes',{fontSize:'15px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(300);
+    drawShelfRow(g,0.7,1.6,7.1,2);
+    drawShelfRow(g,0.7,3.8,7.1,2);
+    const items=GROCERY_ITEMS.filter(i=>i.cat==='getraenke'||i.cat==='suess');
+    placeGroceryItems(this,items,groceryGridPositions(2,6));
+    placeCheckout(this,g,3.6,5.6);
   }
 }
 
@@ -1343,6 +1424,6 @@ new Phaser.Game({
     expandParent:true,
     fullscreenTarget:'g'
   },
-  scene:[StartScreen,Schlafzimmer,Wohnzimmer,Kueche,Bad,Flur,Balkon,Keller,Supermarkt,UI]
+  scene:[StartScreen,Schlafzimmer,Wohnzimmer,Kueche,Bad,Flur,Balkon,Keller,Markt1,Markt2,Markt3,UI]
 });
 window.addEventListener('beforeunload',()=>{if(typeof saveGame==='function')saveGame();});
