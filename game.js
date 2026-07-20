@@ -121,6 +121,8 @@ const GS={
   kellerUnlocked:false,                         // 🔓 geheimer Keller — per Pflanzen-Klick freischaltbar
   shoppingList:[],                              // Item-IDs, die gerade besorgt werden müssen
   cart:[],                                      // Item-IDs, die schon eingesammelt wurden
+  fridge:[],                                     // Item-IDs, die im Kühlschrank liegen (nach der Kasse)
+  unlockedRecipes:['ruehrei','toast','pizza_backen'], // Start-Rezepte, Rest wird beim Kochen freigeschaltet
   period(){if(this.override)return this.override;const h=new Date().getHours();if(h>=6&&h<11)return'morning';if(h>=11&&h<17)return'afternoon';if(h>=17&&h<22)return'evening';return'night';},
   recalc(){const p=this.period(),res={};Object.entries(SCHED).forEach(([k,s])=>{const e=s[p];let room=e.room,slot=e.slot;if(e.alts&&Math.random()<e.alts[0].w){room=e.alts[0].room;slot=e.alts[0].slot;}if(!res[room])res[room]=[];res[room].push({npc:k,slot});});this.placements=res;},
   tickHunger(amount){
@@ -172,10 +174,74 @@ const SPRITE_ASSETS={
   smoke_inhale:     'assets/sprites/smoke_inhale.png',
   smoke_exhale:     'assets/sprites/smoke_exhale.png',
   smoke_idle2:      'assets/sprites/smoke_idle2.png',
+  // 🛒 Supermarkt-Artikel (Key-Schema: grocery_<id>, siehe GROCERY_ITEMS)
+  grocery_eis:        'assets/sprites/grocery_eis.png',
+  grocery_kekse:       'assets/sprites/grocery_kekse.png',
+  grocery_mehl:        'assets/sprites/grocery_mehl.png',
+  grocery_senf:        'assets/sprites/grocery_senf.png',
+  grocery_salz:        'assets/sprites/grocery_salz.png',
+  grocery_ketchup:     'assets/sprites/grocery_ketchup.png',
+  grocery_zucker:      'assets/sprites/grocery_zucker.png',
+  grocery_kaese:       'assets/sprites/grocery_kaese.png',
+  grocery_marmelade:   'assets/sprites/grocery_marmelade.png',
+  grocery_joghurt:     'assets/sprites/grocery_joghurt.png',
+  grocery_lachs:       'assets/sprites/grocery_lachs.png',
+  grocery_orangen:     'assets/sprites/grocery_orangen.png',
+  grocery_erdbeeren:   'assets/sprites/grocery_erdbeeren.png',
+  grocery_bier:        'assets/sprites/grocery_bier.png',
+  grocery_honig:       'assets/sprites/grocery_honig.png',
+  grocery_reis:        'assets/sprites/grocery_reis.png',
+  grocery_oel:         'assets/sprites/grocery_oel.png',
+  grocery_muesli:      'assets/sprites/grocery_muesli.png',
+  grocery_wasser:      'assets/sprites/grocery_wasser.png',
+  grocery_pizza:       'assets/sprites/grocery_pizza.png',
+  grocery_schokolade:  'assets/sprites/grocery_schokolade.png',
+  grocery_wuerstchen:  'assets/sprites/grocery_wuerstchen.png',
+  grocery_kaffee:      'assets/sprites/grocery_kaffee.png',
+  grocery_wein:        'assets/sprites/grocery_wein.png',
+  grocery_trauben:     'assets/sprites/grocery_trauben.png',
+  grocery_chips:       'assets/sprites/grocery_chips.png',
+  grocery_saft:        'assets/sprites/grocery_saft.png',
+  grocery_nudeln:      'assets/sprites/grocery_nudeln.png',
+  grocery_tee:         'assets/sprites/grocery_tee.png',
+  grocery_cola:        'assets/sprites/grocery_cola.png',
+  grocery_brot:        'assets/sprites/grocery_brot.png',
+  // Nachschub aus alle_sprites.zip — jetzt hat fast jeder Artikel ein Sprite
+  grocery_aepfel:      'assets/sprites/grocery_aepfel.png',
+  grocery_avocado:     'assets/sprites/grocery_avocado.png',
+  grocery_bananen:     'assets/sprites/grocery_bananen.png',
+  grocery_butter:      'assets/sprites/grocery_butter.png',
+  grocery_eier:        'assets/sprites/grocery_eier.png',
+  grocery_eistee:      'assets/sprites/grocery_eistee.png',
+  grocery_energy:      'assets/sprites/grocery_energy.png', // = Variante A; _b liegt als Alternative im Ordner
+  grocery_gurke:       'assets/sprites/grocery_gurke.png',
+  grocery_hack:        'assets/sprites/grocery_hack.png',
+  grocery_huehnchen:   'assets/sprites/grocery_huehnchen.png',
+  grocery_karotten:    'assets/sprites/grocery_karotten.png',
+  grocery_kartoffeln:  'assets/sprites/grocery_kartoffeln.png',
+  grocery_knoblauch:   'assets/sprites/grocery_knoblauch.png',
+  grocery_milch:       'assets/sprites/grocery_milch.png',
+  grocery_paprika:     'assets/sprites/grocery_paprika.png',
+  grocery_pilze:       'assets/sprites/grocery_pilze.png',
+  grocery_salat:       'assets/sprites/grocery_salat.png',
+  grocery_spinat:      'assets/sprites/grocery_spinat.png',
+  grocery_tomaten:     'assets/sprites/grocery_tomaten.png',
+  grocery_zitronen:    'assets/sprites/grocery_zitronen.png',
+  grocery_zwiebeln:    'assets/sprites/grocery_zwiebeln.png',
+  // 🛒 Supermarkt-Möbel (fallen automatisch auf die gezeichnete Version
+  // zurück, solange die Datei fehlt — siehe placeFixtureRow/placeCheckout)
+  theke_frisch:     'assets/sprites/theke_frisch.png',
+  regal_kuehl:      'assets/sprites/regal_kuehl.png',
+  regal_vorrat:     'assets/sprites/regal_vorrat.png',
+  kasse:            'assets/sprites/kasse.png',
+  einkaufskorb:     'assets/sprites/einkaufskorb.png',
+  kuehlschrank_kasse: 'assets/sprites/kuehlschrank_kasse.png',
+  kuehlschrank_kasse_offen: 'assets/sprites/kuehlschrank_kasse_offen.png', // Tür offen — wird gezeigt, solange das Auswahl-Panel offen ist
   // Raum-Hintergründe (optional — ersetzen die prozedurale Zeichnung komplett)
   bg_schlafzimmer: null,
   bg_wohnzimmer:   null,
   bg_kueche:       null,
+  fridge:          null, // z.B. 'assets/sprites/fridge.png' — später einfach eintragen
   bg_bad:          null,
   bg_flur:         null,
   bg_balkon:       null,
@@ -195,6 +261,9 @@ const SPRITE_TARGET_H={
   staubsauger: 95,
   smoke_idle1:123, smoke_raise:123, smoke_puff:123, smoke_inhale:123,
   smoke_exhale:123, smoke_idle2:123,
+  kasse: 108,          // Kassentheke — freistehendes Möbelstück, nicht gestreckt
+  einkaufskorb: 46,     // kleine Deko-Requisite
+  kuehlschrank_kasse: 118, // Einzel-Kühlschrank neben der Kasse
 };
 
 // NPCs  — change 'name' to rename!
@@ -400,6 +469,7 @@ const GROCERY_ITEMS=[
   {id:'eis',icon:'🍦',name:'Eis',cat:'suess'},{id:'pizza',icon:'🍕',name:'Tiefkühlpizza',cat:'kuehl'},
   {id:'wuerstchen',icon:'🌭',name:'Würstchen',cat:'kuehl'},{id:'spinat',icon:'🥬',name:'Spinat',cat:'obst'},
   {id:'pilze',icon:'🍄',name:'Pilze',cat:'obst'},{id:'knoblauch',icon:'🧄',name:'Knoblauch',cat:'obst'},
+  {id:'energy',icon:'⚡',name:'Energydrink',cat:'kassekuehl'},{id:'eistee',icon:'🧊',name:'Eistee',cat:'kassekuehl'},
 
 ];
 
@@ -415,6 +485,93 @@ function rollShoppingList(){
   return picked;
 }
 function groceryById(id){return GROCERY_ITEMS.find(g=>g.id===id);}
+
+// 🍳 Rezepte — needs = benötigte Zutaten-IDs (müssen im Kühlschrank sein).
+// ruehrei/toast/pizza_backen sind von Anfang an bekannt, der Rest wird
+// beim erfolgreichen Kochen zufällig freigeschaltet (siehe cookRecipe()).
+const RECIPES=[
+  {id:'ruehrei',icon:'🍳',name:'Rührei',needs:['eier','butter']},
+  {id:'toast',icon:'🍞',name:'Toast mit Marmelade',needs:['brot','marmelade','butter']},
+  {id:'pizza_backen',icon:'🍕',name:'Pizza aufbacken',needs:['pizza']},
+  {id:'spaghetti',icon:'🍝',name:'Spaghetti mit Tomatensauce',needs:['nudeln','tomaten','kaese']},
+  {id:'salat',icon:'🥗',name:'Bunter Salat',needs:['salat','tomaten','gurke','paprika']},
+  {id:'pfannkuchen',icon:'🥞',name:'Pfannkuchen',needs:['mehl','eier','milch','zucker']},
+  {id:'haehnchen_reis',icon:'🍗',name:'Hähnchen mit Reis',needs:['huehnchen','reis','karotten']},
+  {id:'guacamole',icon:'🥑',name:'Guacamole',needs:['avocado','zitronen','zwiebeln','knoblauch']},
+  {id:'kartoffelsuppe',icon:'🍲',name:'Kartoffelsuppe',needs:['kartoffeln','zwiebeln','karotten']},
+  {id:'kaesebrot',icon:'🧀',name:'Käsebrot',needs:['brot','kaese','butter']},
+];
+function recipeById(id){return RECIPES.find(r=>r.id===id);}
+function canCook(recipe){return recipe.needs.every(id=>GS.fridge.includes(id));}
+
+// Kocht ein Gericht: verbraucht die Zutaten, mit Chance ein neues Rezept
+// freizuschalten. Gibt einen Flavor-Text zurück.
+function cookRecipe(recipeId){
+  const recipe=recipeById(recipeId);
+  if(!recipe||!canCook(recipe))return null;
+  recipe.needs.forEach(id=>{
+    const idx=GS.fridge.indexOf(id);
+    if(idx>-1)GS.fridge.splice(idx,1);
+  });
+  let unlockMsg='';
+  const locked=RECIPES.filter(r=>!GS.unlockedRecipes.includes(r.id));
+  if(locked.length&&Math.random()<0.4){
+    const pick=locked[Math.floor(Math.random()*locked.length)];
+    GS.unlockedRecipes=[...GS.unlockedRecipes,pick.id];
+    unlockMsg=` Dabei hast du improvisiert — neues Rezept entdeckt: ${pick.icon} ${pick.name}!`;
+  }
+  saveGame();
+  return `${recipe.icon} ${recipe.name} ist fertig! 😋${unlockMsg}`;
+}
+
+// 🍳 Rezept-Auswahl-Panel — öffnet sich beim Klick auf den Herd.
+// Zeigt alle bekannten Rezepte; kochbare (alle Zutaten im Kühlschrank)
+// sind grün, fehlende Zutaten werden aufgelistet.
+function openRecipePanel(scene){
+  if(scene._recipePanel)return; // schon offen
+  const group=[];
+  const pw=520,ph=380,px=GW/2-pw/2,py=GH/2-ph/2;
+  const bg=scene.add.graphics().setDepth(900);
+  bg.fillStyle(0x1A1228,0.97);bg.fillRoundedRect(px,py,pw,ph,12);
+  bg.lineStyle(2,0x5A4890,1);bg.strokeRoundedRect(px,py,pw,ph,12);
+  group.push(bg);
+  group.push(scene.add.text(GW/2,py+22,'🍳 Was wollen wir kochen?',{fontSize:'16px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#F0E8FF'}).setOrigin(0.5).setDepth(901));
+  const closeTxt=scene.add.text(px+pw-22,py+18,'✖',{fontSize:'16px',fontFamily:'Arial',color:'#C8B8E0'}).setOrigin(0.5).setDepth(902).setInteractive({cursor:'pointer'});
+  closeTxt.on('pointerdown',()=>closePanel());
+  group.push(closeTxt);
+
+  const rowH=42,listY=py+52;
+  RECIPES.filter(r=>GS.unlockedRecipes.includes(r.id)).forEach((recipe,i)=>{
+    const ry=listY+i*rowH;
+    const ok=canCook(recipe);
+    const rowBg=scene.add.graphics().setDepth(900);
+    rowBg.fillStyle(ok?0x2A4A28:0x2A2032,0.9);rowBg.fillRoundedRect(px+16,ry,pw-32,rowH-6,6);
+    if(ok){rowBg.lineStyle(1.5,0x5AA040,0.9);rowBg.strokeRoundedRect(px+16,ry,pw-32,rowH-6,6);}
+    group.push(rowBg);
+    group.push(scene.add.text(px+30,ry+(rowH-6)/2,`${recipe.icon} ${recipe.name}`,{fontSize:'13px',fontFamily:'Arial',fontStyle:'bold',color:'#F0E8FF'}).setOrigin(0,0.5).setDepth(901));
+    if(!ok){
+      const missing=recipe.needs.filter(id=>!GS.fridge.includes(id)).map(id=>groceryById(id)?.name).join(', ');
+      group.push(scene.add.text(px+pw-30,ry+(rowH-6)/2,`fehlt: ${missing}`,{fontSize:'10px',fontFamily:'Arial',color:'#C89090'}).setOrigin(1,0.5).setDepth(901));
+    }else{
+      group.push(scene.add.text(px+pw-30,ry+(rowH-6)/2,'kochen ▶',{fontSize:'11px',fontFamily:'Arial',fontStyle:'bold',color:'#90E080'}).setOrigin(1,0.5).setDepth(901));
+    }
+    const zone=scene.add.zone(px+pw/2,ry+(rowH-6)/2,pw-32,rowH-6).setOrigin(0.5).setInteractive({cursor:ok?'pointer':'default'}).setDepth(905);
+    if(ok)zone.on('pointerdown',()=>{
+      const msg=cookRecipe(recipe.id);
+      closePanel();
+      scene.openItemMsg(GW/2,GH/2-40,msg);
+    });
+    group.push(zone);
+  });
+
+  const closePanel=()=>{group.forEach(o=>o.destroy());scene._recipePanel=null;};
+  scene._recipePanel=group;
+  scene.time.delayedCall(10,()=>{
+    scene.input.once('pointerdown',(p,objs)=>{if(objs.length===0)closePanel();});
+  });
+}
+
+
 
 const QUESTS={
   feed_katze1: new Quest({
@@ -943,12 +1100,36 @@ class Kueche extends BaseRoom{
     wB(g,0xD0C090,0.58,0.9,1.4,2.22,2.36);wB(g,0xD0C090,0.58,2.0,2.5,2.22,2.36);wB(g,0xD0C090,0.58,4.7,5.2,2.22,2.36);wB(g,0xD0C090,0.58,6.5,7.0,2.22,2.36);
     box(g,0.3,0,0,8.4,0.8,0.88,C.KT_CT,C.KT_CTF,C.KT_CTT);
     for(let btx=0.5;btx<8.5;btx+=0.8)wB(g,0xFFFFFF,0,btx,btx+0.74,0.9,1.75,0.18);
-    box(g,0.3,0,0,0.9,0.8,2.2,C.KT_FG,C.KT_FGF,C.KT_FGT);
-    wB(g,0xC0C0BC,0.8,0.38,0.44,0.38,0.72);wB(g,0xC0C0BC,0.8,0.38,0.44,0.98,1.32);
-    wB(g,0xE06060,0.8,0.34,0.56,1.5,1.76);wB(g,0x60A060,0.8,0.56,0.76,1.5,1.76);wB(g,0x6060E0,0.8,0.34,0.56,1.8,2.02);
+    // Kühlschrank — nutzt später automatisch ein echtes Sprite, sobald
+    // 'fridge' in SPRITE_ASSETS + loadedSprites vorhanden ist.
+    if(loadedSprites.has('fridge')){
+      const fS=I(0.75,0.4,0);
+      const fImg=this.add.image(fS.x,fS.y,'fridge').setOrigin(0.5,1).setDepth(0.75+0.4+50);
+      fImg.setScale((SPRITE_TARGET_H['fridge']||130)/fImg.height);
+    }else{
+      box(g,0.3,0,0,0.9,0.8,2.2,C.KT_FG,C.KT_FGF,C.KT_FGT);
+      wB(g,0xC0C0BC,0.8,0.38,0.44,0.38,0.72);wB(g,0xC0C0BC,0.8,0.38,0.44,0.98,1.32);
+      wB(g,0xE06060,0.8,0.34,0.56,1.5,1.76);wB(g,0x60A060,0.8,0.56,0.76,1.5,1.76);wB(g,0x6060E0,0.8,0.34,0.56,1.8,2.02);
+    }
+    const fridgeSc=I(0.75,0.4,1.1);
+    const fridgeZone=this.add.zone(fridgeSc.x,fridgeSc.y,80,140).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(150);
+    fridgeZone.on('pointerdown',()=>{
+      this._npcClick=true;
+      if(this.activeDialog)this.closeDialog();
+      if(!GS.fridge.length){this.openItemMsg(fridgeSc.x,fridgeSc.y-50,'Der Kühlschrank ist leer — Zeit zum Einkaufen! 🛒');return;}
+      const names=GS.fridge.map(id=>groceryById(id)?.name).filter(Boolean).join(', ');
+      this.openItemMsg(fridgeSc.x,fridgeSc.y-50,`Im Kühlschrank: ${names}`);
+    });
     box(g,1.5,0,0.88,1.5,0.8,0.08,C.KT_ST,C.KT_STF,C.KT_STT);
     [[1.68,0.24],[2.52,0.24],[1.68,0.64],[2.52,0.64]].forEach(([bx,by])=>{const bp=I(bx,by,0.97);g.fillStyle(0x484840);g.fillEllipse(bp.x,bp.y,22,10);g.fillStyle(0x282828);g.fillEllipse(bp.x,bp.y,14,6);});
     box(g,1.8,0.2,0.96,0.9,0.6,0.56,0x606060,0x505050,0x707070);
+    const stoveSc=I(2.25,0.4,1.0);
+    const stoveZone=this.add.zone(stoveSc.x,stoveSc.y,90,90).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(150);
+    stoveZone.on('pointerdown',()=>{
+      this._npcClick=true;
+      if(this.activeDialog)this.closeDialog();
+      openRecipePanel(this);
+    });
     box(g,3.5,0,0.88,1.5,0.8,0.06,0xD8D0C0,0xC8C0B0,C.KT_CT);
     const snkP=I(4.0,0.36,0.95);g.fillStyle(0xA0B0B8,0.88);g.fillEllipse(snkP.x,snkP.y,40,18);
     box(g,4.1,0,0.95,0.08,0.3,0.72,0xC0C8CC,0xB0B8BC,0xD0D8DC);
@@ -1175,63 +1356,297 @@ function drawShelfRow(g,wx0,wy,wLen,tiers=2){
   for(let t=1;t<tiers;t++)box(g,wx0,wy,0.35*t+0.35,wLen,0.5,0.06,0x6A4A28,0x6A4A28,0x6A4A28);
 }
 
-// Artikel auf festen Iso-Positionen platzieren — Klick sammelt sie ein,
-// falls sie auf der Einkaufsliste stehen. Automatischer Sprite/Emoji-Fallback.
-function placeGroceryItems(scene,items,positions){
-  items.forEach((item,i)=>{
-    const pos=positions[i];
-    if(!pos)return;
-    const sc=I(pos.wx,pos.wy,0.55);
-    const onList=GS.shoppingList.includes(item.id);
-    const inCart=GS.cart.includes(item.id);
-    const spriteKey='grocery_'+item.id;
-    const depth=pos.wx+pos.wy+50;
-    if(loadedSprites.has(spriteKey)){
-      const img=scene.add.image(sc.x,sc.y,spriteKey).setOrigin(0.5,1).setDepth(depth);
-      img.setScale((SPRITE_TARGET_H[spriteKey]||44)/img.height);
-      if(inCart)img.setAlpha(0.4);
-    }else{
-      const bw=38,bh=38;
-      const bg=scene.add.graphics().setDepth(depth);
-      if(inCart){bg.fillStyle(0x8AAA80,0.55);bg.lineStyle(1.5,0x4A7A3A,0.8);}
-      else if(onList){bg.fillStyle(0xFFF4C8,0.95);bg.lineStyle(1.5,0xE0A830,1);}
-      else{bg.fillStyle(0xFFFFFF,0.55);bg.lineStyle(1,0xC8C0B0,0.7);}
-      bg.fillRoundedRect(sc.x-bw/2,sc.y-bh,bw,bh,6);
-      bg.strokeRoundedRect(sc.x-bw/2,sc.y-bh,bw,bh,6);
-      scene.add.text(sc.x,sc.y-bh+15,item.icon,{fontSize:'17px'}).setOrigin(0.5).setDepth(depth+1);
-      if(inCart)scene.add.text(sc.x+13,sc.y-bh+3,'✓',{fontSize:'11px',fontFamily:'Arial',fontStyle:'bold',color:'#2A6A1A'}).setOrigin(0.5).setDepth(depth+2);
+// ── Markt-Depth: REIHEN-basiert statt wx+wy. ──────────────────────
+// Problem vorher: Regalsegmente derselben Reihe hatten je nach wx
+// unterschiedliche Depth — ein Segment rechts überdeckte Artikel links
+// in derselben Reihe. Jetzt zählt primär die Reihe (wy), Artikel liegen
+// mit +8 IMMER vor ihrem eigenen Regal, die nächste Reihe (Δwy≥1.3 →
+// +26) immer davor. wx fließt nur minimal ein für stabile Sortierung.
+const MDEPTH=(wx,wy)=>wy*20+wx*0.5+40;
+
+// ── Sprite-Ausrichtung ───────────────────────────────────────────
+// 'dl' = Front zeigt nach unten-links (nativ für die LINKE Wand)
+// 'dr' = Front zeigt nach unten-rechts (nativ für die HINTERE Wand)
+// Reihen an der Rückwand brauchen 'dr', Spalten an der linken Wand 'dl' —
+// falsch orientierte Sprites werden automatisch gespiegelt.
+// Sieht ein Regal im Spiel spiegelverkehrt aus? Dann hier einfach den
+// Buchstaben des Sprites umdrehen.
+const SPRITE_FACING={
+  theke_frisch:'dr',
+  regal_vorrat:'dl',
+  regal_kuehl:'dr',
+  kuehlschrank_kasse:'dl',
+  kuehlschrank_kasse_offen:'dl',
+};
+
+// ── Deko-Befüllung der Regal-Sprites ─────────────────────────────
+// Kleine bunte "Packungen" auf den Regalbrettern, damit die Regale
+// befüllt aussehen. KALIBRIERUNG pro Sprite-Art:
+//  - SHELF_BOARDS: Höhen der Regalbretter als Anteil der Sprite-Höhe,
+//    von unten gemessen (0.30 = Brett auf 30% Höhe). An eure Grafiken
+//    anpassen, bis die Packungen auf den Brettern stehen!
+//  - Schräge folgt automatisch der Iso-Perspektive (±0.5); falls eure
+//    Sprites flache Fronten haben, SHELF_DECO_SLOPE auf 0 setzen.
+const SHELF_BOARDS={
+  theke_frisch:[0.30,0.55],
+  regal_kuehl:[0.22,0.42,0.62],
+  regal_vorrat:[0.24,0.46,0.68],
+};
+const SHELF_DECO_SLOPE=0.5;
+// Farbpaletten je Abteilung — bewusst gedeckte "Verpackungsfarben"
+const DECO_PALETTES={
+  obst:     [0xC83E3E,0xE8A030,0x58A83A,0x7AC850,0xE8D060,0xB05AC8],
+  kuehl:    [0xF0F0E8,0xF8E8C0,0xE8B0B8,0xD0E8F0,0xF0D890,0xBCD8E8],
+  vorrat:   [0xC89050,0xE0B870,0xA87840,0xD8C8A0,0xB89860,0xE8D8B0],
+  getraenke:[0x3868C8,0xC83E3E,0x58A83A,0xE8A030,0x8858C8,0x38A8A0],
+  suess:    [0xC85A70,0x8858C8,0xE8A030,0x7A4A28,0xE8D060,0xE87898],
+};
+function stockShelfDeco(scene,depth,cx,baseY,dispW,dispH,spriteKey,cat,seed,flipped){
+  const boards=SHELF_BOARDS[spriteKey];
+  const pal=DECO_PALETTES[cat];
+  if(!boards||!pal)return;
+  const g=scene.add.graphics().setDepth(depth);
+  // Deterministischer Zufall (Seed aus Position) — die Befüllung sieht
+  // pro Regal unterschiedlich aus, flackert aber bei Redraws nicht.
+  let s=(seed*7919+13)%233280;
+  const rnd=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  const slope=(flipped?1:-1)*SHELF_DECO_SLOPE;
+  const half=dispW*0.30;
+  boards.forEach(f=>{
+    const yBase=baseY-dispH*f;
+    let x=cx-half;
+    while(x<cx+half-4){
+      const w=5+Math.floor(rnd()*4),h=7+Math.floor(rnd()*4);
+      if(rnd()>0.16){ // gelegentliche Lücke → wirkt natürlicher
+        const y=yBase+(x+w/2-cx)*slope;
+        g.fillStyle(pal[Math.floor(rnd()*pal.length)],1);
+        g.fillRect(x,y-h,w,h);
+        g.fillStyle(0x000000,0.18);g.fillRect(x,y-2,w,2); // Mini-Schattenkante
+      }
+      x+=w+1;
     }
-    scene.add.text(sc.x,sc.y+3,item.name,{fontSize:'8px',fontFamily:'Arial',color:'#2A2018',backgroundColor:'#FFFFFFB0',padding:{x:2,y:1}}).setOrigin(0.5,0).setDepth(depth+2);
-    const zone=scene.add.zone(sc.x,sc.y-18,44,54).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(depth+5);
-    zone.on('pointerdown',()=>{
-      scene._npcClick=true;
-      if(scene.activeDialog)scene.closeDialog();
-      if(!onList){scene.openItemMsg(sc.x,sc.y-62,'Brauchen wir gerade nicht.');return;}
-      if(inCart){scene.openItemMsg(sc.x,sc.y-62,'Schon im Wagen! ✓');return;}
-      GS.cart=[...GS.cart,item.id];
-      saveGame();
-      scene.scene.restart(); // Regal mit neuem Zustand neu zeichnen
-    });
   });
 }
 
-// Grid-Positionen für eine feste Anzahl Reihen/Spalten erzeugen
-function groceryGridPositions(rows,cols){
-  const pos=[];
-  const wxs=[1.0,2.3,3.6,4.9,6.2,7.5].slice(0,cols);
-  const wys=rows===2?[1.6,3.8]:rows===3?[1.2,2.8,4.4]:[1.0,2.3,3.6,4.9];
-  wys.forEach(wy=>wxs.forEach(wx=>pos.push({wx,wy})));
-  return pos;
+// Regal/Theke als Möbel-Sprite-Reihe: mehrere unverzerrte Exemplare nebeneinander
+// (statt ein einzelnes Bild zu strecken — das sah bei fast quadratischen
+// Möbelbildern wie ein dünner verzerrter Streifen aus). Jedes Exemplar behält
+// sein echtes Seitenverhältnis und wird per Höhe skaliert, wie bei allen
+// anderen Sprites im Spiel. Fällt auf drawShelfRow() zurück, falls kein
+// Sprite geladen ist.
+function placeFixtureRow(scene,g,spriteKey,wx0,wy,wLen,targetH,count=3,decoCat){
+  if(loadedSprites.has(spriteKey)){
+    const flip=(SPRITE_FACING[spriteKey]||'dl')==='dl'; // Reihe braucht 'dr'
+    const step=wLen/count;
+    for(let i=0;i<count;i++){
+      const wx=wx0+step*(i+0.5);
+      const p=I(wx,wy+0.55,0);
+      const img=scene.add.image(p.x,p.y,spriteKey).setOrigin(0.5,1).setDepth(MDEPTH(wx,wy)).setFlipX(flip);
+      img.setScale((targetH||150)/img.height);
+      if(decoCat)stockShelfDeco(scene,MDEPTH(wx,wy)+1,p.x,p.y,img.displayWidth,targetH||150,spriteKey,decoCat,i+Math.round(wy*10),true);
+    }
+  }else{
+    drawShelfRow(g,wx0,wy,wLen,2);
+  }
+}
+
+// Regal-SPALTE entlang der linken Wand (fester wx, variabler wy).
+// Spalten brauchen 'dl'-Ausrichtung — 'dr'-Sprites werden gespiegelt.
+function placeFixtureCol(scene,g,spriteKey,wx,wy0,wLen,targetH,count=3,decoCat){
+  if(loadedSprites.has(spriteKey)){
+    const flip=(SPRITE_FACING[spriteKey]||'dl')==='dr';
+    const step=wLen/count;
+    for(let i=0;i<count;i++){
+      const wy=wy0+step*(i+0.5);
+      const p=I(wx+0.28,wy,0);
+      const img=scene.add.image(p.x,p.y,spriteKey).setOrigin(0.5,1).setDepth(MDEPTH(wx,wy)).setFlipX(flip);
+      img.setScale((targetH||150)/img.height);
+      if(decoCat)stockShelfDeco(scene,MDEPTH(wx,wy)+1,p.x,p.y,img.displayWidth,targetH||150,spriteKey,decoCat,i+Math.round(wy*10)+77,false);
+    }
+  }else{
+    box(g,wx,wy0,0,0.5,wLen,0.9,0x8A6840,0x7A5830,0x9A7850);
+  }
+}
+
+// Deko: Holzkiste mit Obst-Emoji obendrauf — reine Requisite, nicht klickbar.
+function fruitCrate(scene,g,wx,wy,emoji){
+  box(g,wx,wy,0,0.8,0.6,0.42,0x8A6840,0x7A5830,0x9A7850);
+  box(g,wx+0.06,wy+0.05,0.42,0.68,0.5,0.06,0x6A4A28,0x5E4222,0x77552F);
+  const p=I(wx+0.4,wy+0.3,0.55);
+  scene.add.text(p.x,p.y,emoji,{fontSize:'15px'}).setOrigin(0.5).setDepth(MDEPTH(wx+0.4,wy)+3);
+}
+
+// ═══ REGAL-OVERLAY-SYSTEM ═════════════════════════════════════════
+// Statt Mini-Sprites in die Iso-Regale zu quetschen (unlesbar, kaum
+// antippbar auf dem Handy): Regale sind klickbar und öffnen ein großes
+// Auswahl-Panel mit Item-Karten — wie das Laden-Menü in Stardew Valley.
+// Im Raum zeigt ein Schild pro Regalreihe die Abteilung, plus Badge,
+// wie viele gesuchte Listen-Artikel dort noch stehen.
+
+function closeShelfOverlay(scene){
+  if(scene._shelfOverlay){scene._shelfOverlay.destroy(true);scene._shelfOverlay=null;}
+  if(scene._shelfCloseCb){const cb=scene._shelfCloseCb;scene._shelfCloseCb=null;cb();}
+}
+
+function shelfToast(scene,ov,x,y,msg){
+  const t=scene.add.text(x,y,msg,{fontSize:'10px',fontFamily:'Arial',color:'#FFF8EC',backgroundColor:'#3A2818E8',padding:{x:6,y:3}}).setOrigin(0.5,1);
+  ov.add(t);
+  scene.tweens.add({targets:t,y:y-14,alpha:0,delay:700,duration:400,onComplete:()=>t.destroy()});
+}
+
+// Eine Item-Karte im Overlay — Zustand (Liste/Wagen) wird beim Klick
+// direkt aktualisiert, kein Scene-Restart nötig.
+function buildShelfCard(scene,ov,item,cx,cyTop,cw,ch){
+  const g=scene.add.graphics();
+  const draw=()=>{
+    const onList=GS.shoppingList.includes(item.id);
+    const inCart=GS.cart.includes(item.id);
+    g.clear();
+    if(inCart){g.fillStyle(0xDCE8D4,1);g.lineStyle(2,0x4A7A3A,0.9);}
+    else if(onList){g.fillStyle(0xFFF4C8,1);g.lineStyle(2,0xE0A830,1);}
+    else{g.fillStyle(0xFFFFFF,1);g.lineStyle(1.5,0xC8C0B0,0.8);}
+    g.fillRoundedRect(cx-cw/2,cyTop,cw,ch,10);
+    g.strokeRoundedRect(cx-cw/2,cyTop,cw,ch,10);
+  };
+  draw();
+  ov.add(g);
+  const spriteKey='grocery_'+item.id;
+  let icn;
+  if(loadedSprites.has(spriteKey)){
+    icn=scene.add.image(cx,cyTop+38,spriteKey);
+    icn.setScale(Math.min(46/icn.height,60/icn.width));
+  }else{
+    icn=scene.add.text(cx,cyTop+36,item.icon,{fontSize:'28px'}).setOrigin(0.5);
+  }
+  if(GS.cart.includes(item.id))icn.setAlpha(0.45);
+  ov.add(icn);
+  ov.add(scene.add.text(cx,cyTop+ch-20,item.name,{fontSize:'10px',fontFamily:'Arial',color:'#2A2018'}).setOrigin(0.5));
+  const check=scene.add.text(cx+cw/2-13,cyTop+13,'✓',{fontSize:'14px',fontFamily:'Arial',fontStyle:'bold',color:'#2A6A1A'}).setOrigin(0.5).setVisible(GS.cart.includes(item.id));
+  ov.add(check);
+  const z=scene.add.zone(cx,cyTop+ch/2,cw,ch).setOrigin(0.5).setInteractive({cursor:'pointer'});
+  z.on('pointerdown',()=>{
+    scene._npcClick=true;
+    const onList=GS.shoppingList.includes(item.id);
+    const inCart=GS.cart.includes(item.id);
+    if(!onList){shelfToast(scene,ov,cx,cyTop-4,'Brauchen wir gerade nicht.');return;}
+    if(inCart){shelfToast(scene,ov,cx,cyTop-4,'Schon im Wagen ✓');return;}
+    GS.cart=[...GS.cart,item.id];saveGame();
+    draw();check.setVisible(true);icn.setAlpha(0.45);
+    if(scene._shelfBadgeRefresh)scene._shelfBadgeRefresh();
+    shelfToast(scene,ov,cx,cyTop-4,'In den Wagen! 🛒');
+  });
+  ov.add(z);
+}
+
+function openShelfOverlay(scene,title,icon,itemList){
+  closeShelfOverlay(scene);
+  if(scene.activeDialog)scene.closeDialog();
+  const ov=scene.add.container(0,0).setDepth(900);
+  scene._shelfOverlay=ov;
+  const back=scene.add.graphics();
+  back.fillStyle(0x0A080E,0.62);back.fillRect(0,0,GW,GH);
+  ov.add(back);
+  const bz=scene.add.zone(GW/2,GH/2,GW,GH).setOrigin(0.5).setInteractive();
+  bz.on('pointerdown',()=>{scene._npcClick=true;closeShelfOverlay(scene);});
+  ov.add(bz);
+  const cols=Math.min(6,Math.max(2,itemList.length));
+  const rows=Math.ceil(itemList.length/cols);
+  const cw=92,ch=96,gap=10;
+  const pw=Math.max(cols*cw+(cols-1)*gap+48,320);
+  const ph=rows*ch+(rows-1)*gap+92;
+  const px=GW/2-pw/2,py=GH/2-ph/2;
+  const panel=scene.add.graphics();
+  panel.fillStyle(0xF6F1E6,0.98);panel.fillRoundedRect(px,py,pw,ph,16);
+  panel.lineStyle(2,0x8A6840,0.9);panel.strokeRoundedRect(px,py,pw,ph,16);
+  ov.add(panel);
+  const pz=scene.add.zone(GW/2,GH/2,pw,ph).setOrigin(0.5).setInteractive();
+  pz.on('pointerdown',()=>{scene._npcClick=true;});
+  ov.add(pz);
+  ov.add(scene.add.text(GW/2,py+26,icon+' '+title,{fontSize:'16px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5));
+  const cb=scene.add.text(px+pw-24,py+22,'✕',{fontSize:'18px',fontFamily:'Arial',fontStyle:'bold',color:'#8A6840'}).setOrigin(0.5).setInteractive({cursor:'pointer'});
+  cb.on('pointerdown',()=>{scene._npcClick=true;closeShelfOverlay(scene);});
+  ov.add(cb);
+  const gx0=GW/2-(cols*cw+(cols-1)*gap)/2+cw/2;
+  itemList.forEach((item,i)=>{
+    const cx=gx0+(i%cols)*(cw+gap);
+    const cyTop=py+52+Math.floor(i/cols)*(ch+gap);
+    buildShelfCard(scene,ov,item,cx,cyTop,cw,ch);
+  });
+}
+
+// Regalreihe klickbar machen + Abteilungs-Schild mit "noch gesucht"-Badge.
+// onOpen (optional) läuft beim Öffnen des Panels — z.B. um ein Möbel-Sprite
+// auf seine "offen"-Variante zu tauschen.
+function makeShelfRowInteractive(scene,wx0,wy,wLen,count,cat,customItems,customTitle,customIcon,onOpen){
+  const meta=DEPARTMENTS[cat]||{label:customTitle||'Regal',icon:customIcon||'🛒'};
+  const itemsOf=()=>customItems||GROCERY_ITEMS.filter(it=>it.cat===cat);
+  const open=()=>{
+    scene._npcClick=true;
+    openShelfOverlay(scene,customTitle||meta.label,customIcon||meta.icon,itemsOf());
+    if(onOpen)onOpen();
+  };
+  const step=wLen/count;
+  for(let i=0;i<count;i++){
+    const wx=wx0+step*(i+0.5);
+    const p=I(wx,wy+0.55,0);
+    const z=scene.add.zone(p.x,p.y-46,step*IX+18,104).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(MDEPTH(wx,wy)+9);
+    z.on('pointerdown',open);
+  }
+  // Schild über der Reihenmitte
+  const mid=I(wx0+wLen/2,wy+0.55,0);
+  const sign=scene.add.text(mid.x,mid.y-108,meta.icon+' '+(customTitle||meta.label),{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:'#3A2818',backgroundColor:'#FFF8ECE8',padding:{x:6,y:3}}).setOrigin(0.5).setDepth(MDEPTH(wx0+wLen/2,wy)+10);
+  const badge=scene.add.text(sign.x+sign.width/2+2,sign.y-8,'',{fontSize:'9px',fontFamily:'Arial',fontStyle:'bold',color:'#FFFFFF',backgroundColor:'#E0762A',padding:{x:4,y:2}}).setOrigin(0.5).setDepth(MDEPTH(wx0+wLen/2,wy)+11);
+  const refresh=()=>{
+    const n=itemsOf().filter(it=>GS.shoppingList.includes(it.id)&&!GS.cart.includes(it.id)).length;
+    badge.setText(String(n)).setVisible(n>0);
+  };
+  refresh();
+  const prev=scene._shelfBadgeRefresh;
+  scene._shelfBadgeRefresh=()=>{if(prev)prev();refresh();};
+}
+
+// Spalten-Variante für Regale entlang der linken Wand (variabler wy).
+function makeShelfColInteractive(scene,wx,wy0,wLen,count,cat,customItems,customTitle,customIcon){
+  const meta=DEPARTMENTS[cat]||{label:customTitle||'Regal',icon:customIcon||'🛒'};
+  const itemsOf=()=>customItems||GROCERY_ITEMS.filter(it=>it.cat===cat);
+  const open=()=>{
+    scene._npcClick=true;
+    openShelfOverlay(scene,customTitle||meta.label,customIcon||meta.icon,itemsOf());
+  };
+  const step=wLen/count;
+  for(let i=0;i<count;i++){
+    const wy=wy0+step*(i+0.5);
+    const p=I(wx+0.28,wy,0);
+    const z=scene.add.zone(p.x,p.y-46,90,104).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(MDEPTH(wx,wy)+9);
+    z.on('pointerdown',open);
+  }
+  const mid=I(wx+0.28,wy0+wLen/2,0);
+  const sign=scene.add.text(mid.x,mid.y-108,meta.icon+' '+(customTitle||meta.label),{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:'#3A2818',backgroundColor:'#FFF8ECE8',padding:{x:6,y:3}}).setOrigin(0.5).setDepth(MDEPTH(wx,wy0+wLen/2)+10);
+  const badge=scene.add.text(sign.x+sign.width/2+2,sign.y-8,'',{fontSize:'9px',fontFamily:'Arial',fontStyle:'bold',color:'#FFFFFF',backgroundColor:'#E0762A',padding:{x:4,y:2}}).setOrigin(0.5).setDepth(MDEPTH(wx,wy0+wLen/2)+11);
+  const refresh=()=>{
+    const n=itemsOf().filter(it=>GS.shoppingList.includes(it.id)&&!GS.cart.includes(it.id)).length;
+    badge.setText(String(n)).setVisible(n>0);
+  };
+  refresh();
+  const prev=scene._shelfBadgeRefresh;
+  scene._shelfBadgeRefresh=()=>{if(prev)prev();refresh();};
 }
 
 // Kassentheke — schließt die Einkaufs-Quest ab, sobald der Wagen komplett ist
 function placeCheckout(scene,g,wx,wy){
-  box(g,wx,wy,0,1.6,0.7,0.85,0x3A2818,0x2A1C10,0x4A3420);
-  box(g,wx+0.15,wy-0.35,0.85,1.3,0.15,0.5,0x2A2020,0x2A2020,0x3A3030);
+  const kDepth=MDEPTH(wx+0.8,wy+0.35);
+  if(loadedSprites.has('kasse')){
+    const kS=I(wx+0.8,wy+0.35,0);
+    const kImg=scene.add.image(kS.x,kS.y,'kasse').setOrigin(0.5,1).setDepth(kDepth);
+    kImg.setScale((SPRITE_TARGET_H['kasse']||108)/kImg.height);
+  }else{
+    box(g,wx,wy,0,1.6,0.7,0.85,0x3A2818,0x2A1C10,0x4A3420);
+    box(g,wx+0.15,wy-0.35,0.85,1.3,0.15,0.5,0x2A2020,0x2A2020,0x3A3030);
+  }
   const sc=I(wx+0.8,wy+0.35,0.85);
-  scene.add.text(sc.x,sc.y-14,'💳',{fontSize:'20px'}).setOrigin(0.5).setDepth(wx+wy+60);
-  scene.add.text(sc.x,sc.y+8,'KASSE',{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:'#F0E0C0',backgroundColor:'#3A2818C0',padding:{x:4,y:2}}).setOrigin(0.5).setDepth(wx+wy+60);
-  const zone=scene.add.zone(sc.x,sc.y-10,80,70).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(wx+wy+65);
+  scene.add.text(sc.x,sc.y-14,'💳',{fontSize:'20px'}).setOrigin(0.5).setDepth(kDepth+15);
+  scene.add.text(sc.x,sc.y+8,'KASSE',{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:'#F0E0C0',backgroundColor:'#3A2818C0',padding:{x:4,y:2}}).setOrigin(0.5).setDepth(kDepth+15);
+  const zone=scene.add.zone(sc.x,sc.y-10,80,70).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(kDepth+20);
   zone.on('pointerdown',()=>{
     scene._npcClick=true;
     if(scene.activeDialog)scene.closeDialog();
@@ -1243,6 +1658,7 @@ function placeCheckout(scene,g,wx,wy){
       return;
     }
     const quest=QUESTS.einkaufen;
+    GS.fridge=[...new Set([...GS.fridge,...GS.cart])]; // gekaufte Sachen wandern in den Kühlschrank
     if(GS.quests.active==='einkaufen')quest.complete(GS);
     else{GS.shoppingList=[];GS.cart=[];saveGame();}
     scene.openItemMsg(sc.x,sc.y-40,quest.rewardText);
@@ -1254,7 +1670,11 @@ function placeCheckout(scene,g,wx,wy){
 }
 
 // Helle Laden-Wände/-Boden (Basis für alle 3 Markt-Räume)
-function drawMarketShell(g){
+function drawMarketShell(scene,g){
+  // Scene-Instanzen überleben Raumwechsel — alte Overlay-Referenzen
+  // zeigen dann auf zerstörte Objekte. Hier sauber zurücksetzen.
+  scene._shelfOverlay=null;
+  scene._shelfBadgeRefresh=null;
   OX=417;OY=147;
   roomBox(g,0xEDEAE2,0xF5F2EA,0xDDD8CC);
   planks(g,0xE0DACC);
@@ -1263,38 +1683,96 @@ function drawMarketShell(g){
 class Markt1 extends BaseRoom{
   constructor(){super('Markt1','markt1');}
   drawRoom(g){
-    drawMarketShell(g);
+    drawMarketShell(this,g);
     this.add.text(GW/2,26,'🍎 Obst & Gemüse',{fontSize:'15px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(300);
-    drawShelfRow(g,0.7,1.2,7.1,2);
-    drawShelfRow(g,0.7,2.8,7.1,2);
-    drawShelfRow(g,0.7,4.4,7.1,2);
-    const items=GROCERY_ITEMS.filter(i=>i.cat==='obst');
-    placeGroceryItems(this,items,groceryGridPositions(3,6));
+
+    // Nur noch 2 Regale statt 3 identischer Reihen quer durch den Raum:
+    // eins entlang der oberen (hinteren) Wand, eins entlang der linken Wand.
+    // Beide öffnen dasselbe Obst-&-Gemüse-Panel.
+    placeFixtureRow(this,g,'theke_frisch',1.7,0.55,6.4,110,3);
+    makeShelfRowInteractive(this,1.7,0.55,6.4,3,'obst');
+    placeFixtureCol(this,g,'theke_frisch',0.7,1.6,4.6,110,3);
+    makeShelfColInteractive(this,0.7,1.6,4.6,3,'obst');
+
+    // ── Der Rest ist Deko: Obstkisten in der Raummitte (Marktstand-Feeling),
+    //    Pflanze vorne rechts. Türen (y7: 0.5–1.85 / x9: 2.6–3.95) bleiben frei.
+    fruitCrate(this,g,3.6,2.4,'🍎');
+    fruitCrate(this,g,4.7,2.6,'🍊');
+    fruitCrate(this,g,4.1,3.3,'🍋');
+    fruitCrate(this,g,5.9,3.9,'🥕');
+    fruitCrate(this,g,6.7,4.5,'🍇');
+    const plS=I(7.6,5.6,0);
+    plantAt(g,plS.x,plS.y,0x2E8B3A,9);
+
+    // Deko: Stapel Einkaufskörbe am Eingang (Tür vorne links, y7)
+    if(loadedSprites.has('einkaufskorb')){
+      const kS=I(2.4,6.3,0);
+      const kImg=this.add.image(kS.x,kS.y,'einkaufskorb').setOrigin(0.5,1).setDepth(MDEPTH(2.4,6.3));
+      kImg.setScale((SPRITE_TARGET_H['einkaufskorb']||46)/kImg.height);
+    }
   }
 }
 class Markt2 extends BaseRoom{
   constructor(){super('Markt2','markt2');}
   drawRoom(g){
-    drawMarketShell(g);
+    drawMarketShell(this,g);
     this.add.text(GW/2,26,'🥛 Kühlregal & Vorrat',{fontSize:'15px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(300);
-    drawShelfRow(g,0.7,1.0,7.1,2);
-    drawShelfRow(g,0.7,2.3,7.1,2);
-    drawShelfRow(g,0.7,3.6,7.1,2);
-    drawShelfRow(g,0.7,4.9,7.1,2);
-    const items=GROCERY_ITEMS.filter(i=>i.cat==='kuehl'||i.cat==='vorrat');
-    placeGroceryItems(this,items,groceryGridPositions(4,6));
+    // Alles an den Wänden, nichts steht mehr frei im Raum:
+    // Kühlregale komplett entlang der hinteren Wand.
+    placeFixtureRow(this,g,'regal_kuehl',1.7,0.55,6.4,100,3);
+    makeShelfRowInteractive(this,1.7,0.55,6.4,3,'kuehl');
+    // Vorratsregale entlang der linken Wand — die Tür (wy 2.6–3.95,
+    // Durchgang zu Markt 1) bleibt frei, deshalb zwei Teilstücke.
+    placeFixtureCol(this,g,'regal_vorrat',0.7,0.7,1.6,95,1);
+    makeShelfColInteractive(this,0.7,0.7,1.6,1,'vorrat');
+    placeFixtureCol(this,g,'regal_vorrat',0.7,4.2,2.2,95,2);
+    makeShelfColInteractive(this,0.7,4.2,2.2,2,'vorrat');
+    // Raummitte: nur noch Deko-Kisten
+    fruitCrate(this,g,3.8,2.9,'🥫');
+    fruitCrate(this,g,4.8,3.4,'🍝');
+    fruitCrate(this,g,5.8,4.1,'🍞');
   }
 }
 class Markt3 extends BaseRoom{
   constructor(){super('Markt3','markt3');}
   drawRoom(g){
-    drawMarketShell(g);
+    drawMarketShell(this,g);
     this.add.text(GW/2,26,'🥤 Getränke & Süßes',{fontSize:'15px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#3A2818'}).setOrigin(0.5).setDepth(300);
-    drawShelfRow(g,0.7,1.6,7.1,2);
-    drawShelfRow(g,0.7,3.8,7.1,2);
-    const items=GROCERY_ITEMS.filter(i=>i.cat==='getraenke'||i.cat==='suess');
-    placeGroceryItems(this,items,groceryGridPositions(2,6));
+    // Alles an den Wänden: Getränke hinten, Süßes an der linken Wand
+    // (Tür wy 2.6–3.95 zu Markt 2 bleibt frei → zwei Teilstücke).
+    placeFixtureRow(this,g,'regal_kuehl',1.7,0.55,6.4,100,3);
+    makeShelfRowInteractive(this,1.7,0.55,6.4,3,'getraenke');
+    placeFixtureCol(this,g,'regal_vorrat',0.7,0.7,1.6,95,1);
+    makeShelfColInteractive(this,0.7,0.7,1.6,1,'suess');
+    placeFixtureCol(this,g,'regal_vorrat',0.7,4.2,2.2,95,2);
+    makeShelfColInteractive(this,0.7,4.2,2.2,2,'suess');
+    // Raummitte: nur Deko
+    fruitCrate(this,g,3.6,2.7,'🍬');
+    fruitCrate(this,g,4.6,3.3,'🥤');
     placeCheckout(this,g,3.6,5.6);
+
+    // 🧊 Einzel-Kühlschrank direkt neben der Kasse — Energy, Cola, Wasser, Eistee
+    // zum schnellen Mitnehmen. Beim Öffnen des Panels schwingt die Tür auf
+    // (Sprite-Tausch auf die "offen"-Variante), beim Schließen wieder zu.
+    let fImg=null;
+    const fFlip=(SPRITE_FACING['kuehlschrank_kasse']||'dl')==='dl'; // steht an der Rückseite rechts → 'dr' nötig
+    if(loadedSprites.has('kuehlschrank_kasse')){
+      const fS=I(7.6,6.0,0);
+      fImg=this.add.image(fS.x,fS.y,'kuehlschrank_kasse').setOrigin(0.5,1).setDepth(MDEPTH(7.6,6.0)).setFlipX(fFlip);
+      fImg.setScale((SPRITE_TARGET_H['kuehlschrank_kasse']||118)/fImg.height);
+    }else{
+      box(g,7.2,5.7,0,0.9,0.7,1.7,0x384850,0x283238,0x485860);
+    }
+    const fridgeTex=(key)=>{
+      if(!fImg||!loadedSprites.has(key))return;
+      fImg.setTexture(key);
+      fImg.setScale((SPRITE_TARGET_H['kuehlschrank_kasse']||118)/fImg.height);
+    };
+    const kasseKuehlItems=GROCERY_ITEMS.filter(i=>['cola','wasser','energy','eistee'].includes(i.id));
+    makeShelfRowInteractive(this,7.1,6.0,1.0,1,null,kasseKuehlItems,'Kassen-Kühlschrank','🧊',()=>{
+      fridgeTex('kuehlschrank_kasse_offen');
+      this._shelfCloseCb=()=>fridgeTex('kuehlschrank_kasse');
+    });
   }
 }
 
@@ -1305,7 +1783,7 @@ class Markt3 extends BaseRoom{
 const SAVE_KEY='cozyhome_save_v1';
 function saveGame(){
   try{
-    const data={hunger:GS.hunger,dirtiness:GS.dirtiness,quests:GS.quests,room:GS.room,kellerUnlocked:GS.kellerUnlocked,shoppingList:GS.shoppingList,cart:GS.cart,savedAt:Date.now()};
+    const data={hunger:GS.hunger,dirtiness:GS.dirtiness,quests:GS.quests,room:GS.room,kellerUnlocked:GS.kellerUnlocked,shoppingList:GS.shoppingList,cart:GS.cart,fridge:GS.fridge,unlockedRecipes:GS.unlockedRecipes,savedAt:Date.now()};
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
   }catch(e){/* localStorage evtl. nicht verfügbar — einfach ignorieren */}
 }
@@ -1321,6 +1799,8 @@ function loadGame(){
     if(data.kellerUnlocked)GS.kellerUnlocked=data.kellerUnlocked;
     if(data.shoppingList)GS.shoppingList=data.shoppingList;
     if(data.cart)GS.cart=data.cart;
+    if(data.fridge)GS.fridge=data.fridge;
+    if(data.unlockedRecipes)GS.unlockedRecipes=data.unlockedRecipes;
     return true;
   }catch(e){return false;}
 }
