@@ -39,6 +39,44 @@ function plantAt(g,sx,sy,col,sc=8){
   g.fillRect(sx+3*s,sy-8*s,8*s,3*s);
 }
 
+// ── Weichmacher für box()-Möbel (v2, flächen-treu) ───────────────
+// Wichtig: KEINE bildschirmflachen Ellipsen über Iso-Geometrie malen —
+// die laufen über Kanten und wirken wie Nebel. Stattdessen liegen alle
+// Schattierungs-Layer als Parallelogramme in WELT-Koordinaten exakt auf
+// der Top-Fläche der Box und können konstruktionsbedingt nicht überlaufen.
+
+// Polster-Effekt: 2 eingerückte helle Layer (weiche Wölbung) + dunkle
+// Randstreifen an Vorder-/Außenkante (gerundete Kante) + Mittelnaht.
+function cushionDetail(g,wx,wy,wz,sw,sd,sh,opts={}){
+  const z1=wz+sh;
+  const hi=opts.highlight??0xFFFFFF;
+  const inset=Math.min(sw,sd)*(opts.inset??0.16);
+  const quad=(i,col,a)=>fp(g,col,[I(wx+i,wy+i,z1),I(wx+sw-i,wy+i,z1),I(wx+sw-i,wy+sd-i,z1),I(wx+i,wy+sd-i,z1)],a);
+  quad(inset,hi,0.10);       // Wölbung, außen
+  quad(inset*2.4,hi,0.10);   // Wölbung, Kern (ergibt weichen 2-Stufen-Verlauf)
+  // Dunkle Streifen entlang vorderer (+y) und rechter (+x) Topkante
+  fp(g,0x000000,[I(wx,wy+sd-inset,z1),I(wx+sw,wy+sd-inset,z1),I(wx+sw,wy+sd,z1),I(wx,wy+sd,z1)],0.10);
+  fp(g,0x000000,[I(wx+sw-inset,wy,z1),I(wx+sw,wy,z1),I(wx+sw,wy+sd,z1),I(wx+sw-inset,wy+sd,z1)],0.10);
+  if(opts.seam!==false){
+    g.lineStyle(1,0x000000,0.20);
+    const a=I(wx+sw*0.5,wy+sd*0.06,z1),b=I(wx+sw*0.5,wy+sd*0.94,z1);
+    g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.strokePath();
+  }
+}
+
+// Dünne helle Linie entlang der oberen Vorderkante einer Box — simuliert
+// eine Ziernaht/Paspel am Polster-Rand (z.B. Sofalehne, Kopfteil).
+function edgePiping(g,wx,wy,wz,sw,col=0xFFFFFF,a=0.3){
+  const p0=I(wx,wy,wz),p1=I(wx+sw,wy,wz);
+  g.lineStyle(1,col,a);g.beginPath();g.moveTo(p0.x,p0.y);g.lineTo(p1.x,p1.y);g.strokePath();
+}
+
+// Dezenter Bodenschatten: Iso-Parallelogramm knapp um die Stellfläche,
+// VOR dem Möbel zeichnen. Kein Ellipsen-Fleck mehr.
+function floorShadow(g,wx,wy,sw,sd,m=0.18,a=0.10){
+  hP(g,0x000000,wx-m,wy-m,wx+sw+m,wy+sd+m,0,a);
+}
+
 // Generic frosted-glass door — fixed X plane (like a left/right wall)
 function drawDoorX(g,wx,y0,y1,z1){
   z1=z1||1.88;
@@ -237,6 +275,9 @@ const SPRITE_ASSETS={
   einkaufskorb:     'assets/sprites/einkaufskorb.png',
   kuehlschrank_kasse: 'assets/sprites/kuehlschrank_kasse.png',
   kuehlschrank_kasse_offen: 'assets/sprites/kuehlschrank_kasse_offen.png', // Tür offen — wird gezeigt, solange das Auswahl-Panel offen ist
+  sofa:             'assets/sprites/sofa.png', // Wohnzimmer L-Sofa (SVG-gerendert, 2x-Auflösung — wird mit setScale(0.5) angezeigt)
+  tisch:            'assets/sprites/tisch.png', // Couchtisch (SVG-gerendert, 3x-Auflösung)
+  stuhl:            'assets/sprites/stuhl.png', // Sessel — EIN Sprite, wird 2x eingesetzt (1x normal, 1x gespiegelt) für "sich gegenüber sitzen"
   // Raum-Hintergründe (optional — ersetzen die prozedurale Zeichnung komplett)
   bg_schlafzimmer: null,
   bg_wohnzimmer:   null,
@@ -307,7 +348,7 @@ const SCHED={
 
 const ROOMS={
   schlafzimmer:{label:'Schlafzimmer',exits:[{to:'wohnzimmer',label:'Wohnzimmer \u25b6'},{to:'bad',label:'Bad \u25bc'}],slots:{bed_ich:{wx:1.3,wy:0.4},bed_sie:{wx:1.3,wy:1.5},bed_feet:{wx:1.6,wy:5.4},wardrobe:{wx:5.5,wy:2.0},floor_r:{wx:7.0,wy:4.5}}},
-  wohnzimmer:{label:'Wohnzimmer',exits:[{to:'schlafzimmer',label:'\u25c4 Schlafzimmer'},{to:'flur',label:'Flur \u25bc'},{to:'balkon',label:'Balkon \u25b2'}],slots:{couch_l:{wx:3.0,wy:1.5},couch_r:{wx:4.3,wy:1.5},carpet:{wx:4.3,wy:5.3},tv_area:{wx:3.0,wy:5.8},cat_tree:{wx:0.8,wy:1.5},window:{wx:1.0,wy:3.7}}},
+  wohnzimmer:{label:'Wohnzimmer',exits:[{to:'schlafzimmer',label:'\u25c4 Schlafzimmer'},{to:'flur',label:'Flur \u25bc'},{to:'balkon',label:'Balkon \u25b2'}],slots:{couch_l:{wx:3.0,wy:1.9},couch_r:{wx:4.3,wy:1.9},carpet:{wx:4.3,wy:5.3},tv_area:{wx:3.0,wy:5.8},cat_tree:{wx:0.8,wy:1.5},window:{wx:1.0,wy:3.7}}},
   kueche:{label:'Kueche',exits:[{to:'flur',label:'\u25c4 Flur'}],slots:{stove:{wx:1.5,wy:3.5},fridge:{wx:1.0,wy:2.0},table_l:{wx:6.0,wy:4.5},table_r:{wx:7.2,wy:4.5},sink:{wx:3.0,wy:3.0}}},
   bad:{label:'Bad',exits:[{to:'schlafzimmer',label:'Schlafzimmer \u25b2'}],slots:{toilet:{wx:1.5,wy:3.5},sink:{wx:4.5,wy:3.0},bath:{wx:7.5,wy:3.5}}},
   flur:{label:'Flur',exits:[{to:'wohnzimmer',label:'Wohnzimmer \u25b2'},{to:'kueche',label:'Kueche \u25b6'}],slots:{center:{wx:2.0,wy:4.5},coat:{wx:1.2,wy:3.0},shoe:{wx:2.3,wy:3.3}}},
@@ -1030,36 +1071,101 @@ class Wohnzimmer extends BaseRoom{
     for(let sz=0.2;sz<2.1;sz+=0.4)box(g,0.42,0.32,sz,0.32,0.32,0.05,0xC4A050,0xB49040,0xD4B060);
     const toyS=I(0.5,0.3,2.72);g.fillStyle(0xE04040);g.fillRect(toyS.x-4,toyS.y,8,12);g.fillEllipse(toyS.x,toyS.y+14,10,8);
 
-    // === SOFA (Warmes Lederbraun, L-Form mit grauen Kissen) ===
-    // --- HAUPTTEIL AN DER RÜCKWAND ---
-    box(g,1.8,0.5,0, 6.9,0.3,1.15, 0x6A4020,0x805028,0x5E3818);
-    box(g,1.8,0.8,0, 6.9,1.8,0.55, 0x6A4020,0x805028,0x9A6840);
-    box(g,1.9,0.85,0.55, 2.3,1.65,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
-    box(g,4.4,0.85,0.55, 2.3,1.65,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
-    box(g,1.6,0.5,0, 0.22,2.1,0.65, 0x6A4020,0x805028,0x6A4020);
-    // --- KISSEN HAUPTTEIL (Schiefergrau) ---
-    box(g,1.95,0.58,0.55, 0.95,0.85,0.52, 0x707880,0x848C96,0x9CA4AC);
-    box(g,3.10,0.58,0.55, 0.95,0.85,0.52, 0x7A828C,0x8E96A0,0xA8B0BA);
-    box(g,4.40,0.58,0.55, 0.95,0.85,0.52, 0x707880,0x848C96,0x9CA4AC);
-    hP(g,0x5E3818,2.0,1.0,4.0,2.7,0.55,0.12);
-    // --- ECKTEIL (an der rechten Wand entlang) ---
-    box(g,8.4,0.5,0, 0.6,3.5,1.15, 0x6A4020,0x805028,0x5E3818);
-    box(g,7.0,0.5,0, 1.4,3.5,0.55, 0x6A4020,0x805028,0x9A6840);
-    box(g,7.1,0.6,0.55, 1.25,1.6,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
-    box(g,7.1,2.4,0.55, 1.25,1.5,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
-    // --- KISSEN ECKTEIL (Schiefergrau) ---
-    box(g,7.6,0.65,0.55, 0.85,0.85,0.52, 0x7A828C,0x8E96A0,0xA8B0BA);
-    box(g,7.6,2.50,0.55, 0.85,0.85,0.52, 0x707880,0x848C96,0x9CA4AC);
+    // === SOFA (graues Stoffsofa mit Beige-Kissen, SVG-gerendertes Sprite) ===
+    // Der Anker leitet sich aus dem SVG-Generator ab (sofa_svg.py):
+    // Bild-Pixel (0,0) entspricht Spiel-Screen (OX-106.1, OY-30.5).
+    // Welt-Geometrie ist identisch zur prozeduralen Version — die
+    // Sitz-Slots couch_l/couch_r passen dadurch unverändert.
+    if(loadedSprites.has('sofa')){
+      // Kleiner skaliert (0.40 statt 0.5) — Anker (0,0) sitzt an der
+      // hinteren Ecke, beim Verkleinern zieht sich das Sofa also von dort
+      // aus zusammen. Leichter Offset gleicht das aus, damit die
+      // Rückenlehne weiter an der Wand bleibt statt in den Raum zu rutschen.
+      // +75px Richtung rechts, damit das Eckteil an der rechten Wand anliegt.
+      this.add.image(OX-106.1*0.8+75,OY-30.5*0.8,'sofa').setOrigin(0,0).setScale(0.40).setDepth(1);
+    }else{
+      // Fallback: prozedurales Sofa (falls sofa.png fehlt)
+      floorShadow(g,1.8,0.5,6.9,2.1);
+      floorShadow(g,7.0,0.5,2.0,3.5);
+      box(g,1.8,0.5,0, 6.9,0.3,1.15, 0x6A4020,0x805028,0x5E3818);
+      box(g,1.8,0.8,0, 6.9,1.8,0.55, 0x6A4020,0x805028,0x9A6840);
+      box(g,1.9,0.85,0.55, 2.3,1.65,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
+      edgePiping(g,1.9,0.85,0.90,2.3,0xE8C8A0,0.4);
+      box(g,4.4,0.85,0.55, 2.3,1.65,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
+      edgePiping(g,4.4,0.85,0.90,2.3,0xE8C8A0,0.4);
+      box(g,1.6,0.5,0, 0.22,2.1,0.65, 0x6A4020,0x805028,0x6A4020);
+      box(g,1.95,0.58,0.55, 0.95,0.85,0.52, 0x707880,0x848C96,0x9CA4AC);
+      cushionDetail(g,1.95,0.58,0.55,0.95,0.85,0.52);
+      box(g,3.10,0.58,0.55, 0.95,0.85,0.52, 0x7A828C,0x8E96A0,0xA8B0BA);
+      cushionDetail(g,3.10,0.58,0.55,0.95,0.85,0.52);
+      box(g,4.40,0.58,0.55, 0.95,0.85,0.52, 0x707880,0x848C96,0x9CA4AC);
+      cushionDetail(g,4.40,0.58,0.55,0.95,0.85,0.52);
+      hP(g,0x5E3818,2.0,1.0,4.0,2.7,0.55,0.12);
+      box(g,8.4,0.5,0, 0.6,3.5,1.15, 0x6A4020,0x805028,0x5E3818);
+      box(g,7.0,0.5,0, 1.4,3.5,0.55, 0x6A4020,0x805028,0x9A6840);
+      box(g,7.1,0.6,0.55, 1.25,1.6,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
+      edgePiping(g,7.1,0.6,0.90,1.25,0xE8C8A0,0.4);
+      box(g,7.1,2.4,0.55, 1.25,1.5,0.35, 0x7A4C28,0x8E5C34,0xA8764C);
+      edgePiping(g,7.1,2.4,0.90,1.25,0xE8C8A0,0.4);
+      box(g,7.6,0.65,0.55, 0.85,0.85,0.52, 0x7A828C,0x8E96A0,0xA8B0BA);
+      cushionDetail(g,7.6,0.65,0.55,0.85,0.85,0.52);
+      box(g,7.6,2.50,0.55, 0.85,0.85,0.52, 0x707880,0x848C96,0x9CA4AC);
+      cushionDetail(g,7.6,2.50,0.55,0.85,0.85,0.52);
+    }
 
-    // === TISCH (linke Wand x=0, "oberste Wand") ===
-    box(g,0,3.0,0, 0.9,1.8,0.44, C.LR_TBL,C.LR_TBLF,C.LR_TBLT);
-    const mugS=I(0.45,3.5,0.44);g.fillStyle(0xF0E8C8);g.fillRect(mugS.x-6,mugS.y-10,12,10);g.fillStyle(0x7A4020);g.fillRect(mugS.x-5,mugS.y-9,10,4);
-    const bkS=I(0.45,4.3,0.44);g.fillStyle(C.LR_P1);g.fillRect(bkS.x-10,bkS.y-5,20,8);
-    // Stühle vor dem Tisch
-    box(g,1.0,3.1,0, 0.9,0.85,0.46, 0xA07838,0x906830,0xB08840);
-    box(g,1.0,3.1,0.46, 0.9,0.1,1.0, 0xA07838,0x906830,0xB08840);
-    box(g,1.0,4.35,0, 0.9,0.85,0.46, 0xA07838,0x906830,0xB08840);
-    box(g,1.0,4.35,0.46, 0.9,0.1,1.0, 0xA07838,0x906830,0xB08840);
+    // === Gemeinsame Konstanten fuer SVG-gerenderte Moebel ===
+    // Anker stammen aus table_svg.py / chair_r_svg.py (bounds()-Berechnung dort).
+    // Formel: setOrigin(0,0); setScale(FS/RS); Pos = I(wx,wy,0) - (OXs,OYs)*FS
+    // FS = Anzeige-Faktor, RS = cairosvg-Aufloesung beim Rendern (3).
+    //
+    // DEPTH: NICHT MDEPTH() verwenden! Das gewichtet wy 40x staerker als wx
+    // (wy*20 + wx*0.5) und passt nur zu den Marktraeumen, wo alles in Reihen
+    // entlang y steht. In der Iso-Projektion zaehlt (x+y) gleichgewichtet.
+    // Charaktere nutzen wx+wy+100 — Moebel bekommen dieselbe Metrik mit -1,
+    // damit bei gleicher Position die Person davor steht.
+    const FS=1.0, RS=3;
+    const FDEPTH=(wx,wy)=>wx+wy+99;
+
+    // === TISCH + 2 STÜHLE an der linken Wand (SVG-gerenderte Sprites) ===
+    // Ersetzt den frueheren Box-Tisch box(g,0,3.0,0, 0.9,1.8,0.44) samt seiner
+    // beiden Box-Stuehle. Der Tisch-Sprite ist eigens laengs der Wand generiert
+    // (0.9 breit x 1.8 tief) — exakt die Grundflaeche des alten.
+    //
+    // WICHTIG setOrigin(0,0): Phaser verankert Bilder standardmaessig MITTIG.
+    // Die Ankerformel unten geht aber von der linken oberen Ecke aus — ohne
+    // setOrigin landet alles um die halbe Sprite-Groesse versetzt (das Ensemble
+    // stand dadurch mitten im Raum statt an seinem Platz).
+    const TWX=0.0,TWY=3.0,TSW=0.9,TSD=1.8;
+    if(loadedSprites.has('tisch')){
+      const OXt=88.8,OYt=61.5; // aus table_svg.py (wandbuendig, Esstischhoehe 1.03)
+      const tp=I(TWX,TWY,0);
+      this.add.image(tp.x-OXt*FS,tp.y-OYt*FS,'tisch').setOrigin(0,0).setScale(FS/RS)
+        .setDepth(FDEPTH(TWX+TSW/2,TWY+TSD/2));
+    }else{
+      box(g,TWX,TWY,0, TSW,TSD,0.44, C.LR_TBL,C.LR_TBLF,C.LR_TBLT);
+    }
+    // Deko auf dem Tisch (Tasse + Buch) — auf Plattenhoehe 1.03
+    const mugS=I(0.45,3.5,1.03);g.fillStyle(0xF0E8C8);g.fillRect(mugS.x-6,mugS.y-10,12,10);g.fillStyle(0x7A4020);g.fillRect(mugS.x-5,mugS.y-9,10,4);
+    const bkS=I(0.45,4.3,1.03);g.fillStyle(C.LR_P1);g.fillRect(bkS.x-10,bkS.y-5,20,8);
+    if(loadedSprites.has('stuhl')){
+      const OXc=44.64,OYc=68.64; // aus chair_r_svg.py — Lehne an der RECHTEN Sitzkante
+      const CSW=0.78,CBD=0.13,CSD=0.72; // Sitzbreite + Lehnentiefe, Sitztiefe
+      // Beide Stuehle rechts vom Tisch, Lehne aussen -> sie schauen zum Tisch.
+      // Kein setFlipX: gespiegelt wuerde auch der Anker springen und die
+      // Schattierung mitkippen; die Blickrichtung steckt direkt im Sprite.
+      const chair=(wx,wy)=>{
+        const p=I(wx,wy,0);
+        this.add.image(p.x-OXc*FS,p.y-OYc*FS,'stuhl').setOrigin(0,0).setScale(FS/RS)
+          .setDepth(FDEPTH(wx+(CSW+CBD)/2,wy+CSD/2));
+      };
+      chair(TWX+TSW-0.05, 3.10); // 0.05 unter die Platte geschoben
+      chair(TWX+TSW-0.05, 3.98);
+    }else{
+      box(g,1.0,3.1,0, 0.9,0.85,0.46, 0xA07838,0x906830,0xB08840);
+      box(g,1.0,3.1,0.46, 0.9,0.1,1.0, 0xA07838,0x906830,0xB08840);
+      box(g,1.0,4.35,0, 0.9,0.85,0.46, 0xA07838,0x906830,0xB08840);
+      box(g,1.0,4.35,0.46, 0.9,0.1,1.0, 0xA07838,0x906830,0xB08840);
+    }
 
     // === FERNSEHER (freistehend auf weißem Sideboard, vorne) ===
     box(g,1.8,6.5,0, 5.4,0.5,0.42, 0xFFFFFF,0xFFFFFF,0xFFFFFF);
