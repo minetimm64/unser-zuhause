@@ -277,7 +277,8 @@ const SPRITE_ASSETS={
   kuehlschrank_kasse_offen: 'assets/sprites/kuehlschrank_kasse_offen.png', // Tür offen — wird gezeigt, solange das Auswahl-Panel offen ist
   sofa:             'assets/sprites/sofa.png', // Wohnzimmer L-Sofa (SVG-gerendert, 2x-Auflösung — wird mit setScale(0.5) angezeigt)
   tisch:            'assets/sprites/tisch.png', // Couchtisch (SVG-gerendert, 3x-Auflösung)
-  stuhl:            'assets/sprites/stuhl.png', // Sessel — EIN Sprite, wird 2x eingesetzt (1x normal, 1x gespiegelt) für "sich gegenüber sitzen"
+  stuhl_r:          'assets/sprites/stuhl_r.png', // echtes Sprite (Gemini) — Lehne rechts
+  stuhl_l:          'assets/sprites/stuhl_l.png', // echtes Sprite (Gemini) — Lehne links
   // Raum-Hintergründe (optional — ersetzen die prozedurale Zeichnung komplett)
   bg_schlafzimmer: null,
   bg_wohnzimmer:   null,
@@ -305,6 +306,7 @@ const SPRITE_TARGET_H={
   kasse: 108,          // Kassentheke — freistehendes Möbelstück, nicht gestreckt
   einkaufskorb: 46,     // kleine Deko-Requisite
   kuehlschrank_kasse: 118, // Einzel-Kühlschrank neben der Kasse
+  stuhl_r: 68, stuhl_l: 68, // echte Stuhl-Sprites — war 105 (viel zu gross, ueberlappte den Tisch)
 };
 
 // NPCs  — change 'name' to rename!
@@ -1147,19 +1149,27 @@ class Wohnzimmer extends BaseRoom{
     // Deko auf dem Tisch (Tasse + Buch) — auf Plattenhoehe 1.03
     const mugS=I(0.45,3.5,1.03);g.fillStyle(0xF0E8C8);g.fillRect(mugS.x-6,mugS.y-10,12,10);g.fillStyle(0x7A4020);g.fillRect(mugS.x-5,mugS.y-9,10,4);
     const bkS=I(0.45,4.3,1.03);g.fillStyle(C.LR_P1);g.fillRect(bkS.x-10,bkS.y-5,20,8);
-    if(loadedSprites.has('stuhl')){
-      const OXc=44.64,OYc=68.64; // aus chair_r_svg.py — Lehne an der RECHTEN Sitzkante
-      const CSW=0.78,CBD=0.13,CSD=0.72; // Sitzbreite + Lehnentiefe, Sitztiefe
-      // Beide Stuehle rechts vom Tisch, Lehne aussen -> sie schauen zum Tisch.
-      // Kein setFlipX: gespiegelt wuerde auch der Anker springen und die
-      // Schattierung mitkippen; die Blickrichtung steckt direkt im Sprite.
-      const chair=(wx,wy)=>{
-        const p=I(wx,wy,0);
-        this.add.image(p.x-OXc*FS,p.y-OYc*FS,'stuhl').setOrigin(0,0).setScale(FS/RS)
-          .setDepth(FDEPTH(wx+(CSW+CBD)/2,wy+CSD/2));
-      };
-      chair(TWX+TSW-0.05, 3.10); // 0.05 unter die Platte geschoben
-      chair(TWX+TSW-0.05, 3.98);
+    // Echte Sprites (Gemini) statt SVG — Platzierung wie bei euren anderen
+    // Moebeln (regal_kuehl, kuehlschrank_kasse etc.): Boden-Ankerpunkt via
+    // setOrigin(0.5,1) + Skalierung auf SPRITE_TARGET_H. Kein manuelles
+    // OXc/OYc-Rechnen mehr noetig — das war nur fuer die SVG-Generatoren
+    // erforderlich, die keine fertige Boden-Kontaktflaeche hatten.
+    //
+    // ANNAHME zur Ausrichtung (bitte pruefen!): "stuhl_r" = Lehne rechts,
+    // gedacht fuer die LANGE Tischkante (x=TWX+TSW); "stuhl_l" = Lehne
+    // links, gedacht fuer die KURZE Kante vorne (y=TWY+TSD) — passend zu
+    // eurer Skizze (ein Stuhl rechts, einer vorne). Falls ein Stuhl in die
+    // falsche Richtung schaut: hier einfach die beiden chair()-Aufrufe
+    // tauschen oder die wx/wy-Werte anpassen.
+    const chair=(key,wx,wy,flip)=>{
+      if(!loadedSprites.has(key))return;
+      const p=I(wx,wy,0);
+      const img=this.add.image(p.x,p.y,key).setOrigin(0.5,1).setFlipX(!!flip).setDepth(FDEPTH(wx,wy));
+      img.setScale((SPRITE_TARGET_H[key]||105)/img.height);
+    };
+    chair('stuhl_r', TWX+TSW+0.20, TWY+TSD/2, false); // lange Kante rechts, mittig
+    chair('stuhl_l', TWX+TSW/2,    TWY+TSD+0.20, true); // kurze Kante vorne, mittig, gespiegelt
+    if(!loadedSprites.has('stuhl')&&!loadedSprites.has('stuhl_v')){
     }else{
       box(g,1.0,3.1,0, 0.9,0.85,0.46, 0xA07838,0x906830,0xB08840);
       box(g,1.0,3.1,0.46, 0.9,0.1,1.0, 0xA07838,0x906830,0xB08840);
