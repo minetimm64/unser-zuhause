@@ -1167,8 +1167,8 @@ class Wohnzimmer extends BaseRoom{
       const img=this.add.image(p.x,p.y,key).setOrigin(0.5,1).setFlipX(!!flip).setDepth(FDEPTH(wx,wy));
       img.setScale((SPRITE_TARGET_H[key]||105)/img.height);
     };
-    chair('stuhl_r', TWX+TSW+0.20, TWY+TSD/2, false); // lange Kante rechts, mittig
-    chair('stuhl_l', TWX+TSW/2,    TWY+TSD+0.20, true); // kurze Kante vorne, mittig, gespiegelt
+    chair('stuhl_l', TWX+TSW+0.70, TWY+TSD/2,  true); // lange vordere Kante, mittig
+    chair('stuhl_r', TWX+TSW/2,    TWY-0.62,    false); // kurze Kante bei der Tür (hintere/kleinere y-Seite), mittig, gespiegelt
     if(!loadedSprites.has('stuhl')&&!loadedSprites.has('stuhl_v')){
     }else{
       box(g,1.0,3.1,0, 0.9,0.85,0.46, 0xA07838,0x906830,0xB08840);
