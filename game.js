@@ -153,23 +153,42 @@ const C={
 // GAME STATE
 const GS={
   room:'schlafzimmer',placements:null,override:null,
-  hunger:{katze1:20,katze2:20},                 // 0-100, steigt mit der Zeit
+  // Katzen: 0-100, STEIGT mit der Zeit (0=satt, 100=am Verhungern) — bestehende Logik.
+  // Menschen: 0-100, SINKT mit der Zeit (100=satt, 0=am Verhungern) — "leert sich".
+  hunger:{katze1:20,katze2:20,ich:100,freundin:100},
   dirtiness:15,                                  // 0-100, steigt mit der Zeit — für die Staubsaugen-Quest
   quests:{active:null,completed:[],lastOffered:{}},
   kellerUnlocked:false,                         // 🔓 geheimer Keller — per Pflanzen-Klick freischaltbar
   shoppingList:[],                              // Item-IDs, die gerade besorgt werden müssen
   cart:[],                                      // Item-IDs, die schon eingesammelt wurden
-  fridge:[],                                     // Item-IDs, die im Kühlschrank liegen (nach der Kasse)
-  unlockedRecipes:['ruehrei','toast','pizza_backen'], // Start-Rezepte, Rest wird beim Kochen freigeschaltet
+  fridge:{},                                     // {itemId: menge} — Zutaten im Kühlschrank (nach der Kasse)
+  unlockedRecipes:['ruehrei','toast','pizza_backen'], // Start-Rezepte, Rest wird durchs Sammeln der Zutaten freigeschaltet
   period(){if(this.override)return this.override;const h=new Date().getHours();if(h>=6&&h<11)return'morning';if(h>=11&&h<17)return'afternoon';if(h>=17&&h<22)return'evening';return'night';},
   recalc(){const p=this.period(),res={};Object.entries(SCHED).forEach(([k,s])=>{const e=s[p];let room=e.room,slot=e.slot;if(e.alts&&Math.random()<e.alts[0].w){room=e.alts[0].room;slot=e.alts[0].slot;}if(!res[room])res[room]=[];res[room].push({npc:k,slot});});this.placements=res;},
   tickHunger(amount){
     ['katze1','katze2'].forEach(k=>{this.hunger[k]=Math.min(100,(this.hunger[k]||0)+amount);});
+    // Menschlicher Hunger-State leert sich mit der Zeit (100=satt → 0=hungrig).
+    ['ich','freundin'].forEach(k=>{const cur=this.hunger[k]===undefined?100:this.hunger[k];this.hunger[k]=Math.max(0,cur-amount);});
   },
   tickDirtiness(amount){
     this.dirtiness=Math.min(100,(this.dirtiness||0)+amount);
+  },
+  // Nach dem Essen wird der Hunger-State der übergebenen Personen (Keys aus NPCS) wieder aufgefüllt.
+  feedHumans(keys,amount=100){
+    keys.forEach(k=>{this.hunger[k]=Math.min(100,(this.hunger[k]||0)+amount);});
   }
 };
+
+// 🧊 Kühlschrank-Helfer — GS.fridge ist eine {itemId: menge}-Map, damit
+// Rezepte für 2 Personen (= doppelte Zutatenmenge) korrekt geprüft/verbraucht werden können.
+function fridgeCount(id){return (GS.fridge&&GS.fridge[id])||0;}
+function fridgeHas(id,qty=1){return fridgeCount(id)>=qty;}
+function fridgeAdd(id,qty=1){if(!GS.fridge)GS.fridge={};GS.fridge[id]=(GS.fridge[id]||0)+qty;}
+function fridgeRemove(id,qty=1){
+  if(!GS.fridge||!GS.fridge[id])return;
+  const left=GS.fridge[id]-qty;
+  if(left>0)GS.fridge[id]=left;else delete GS.fridge[id];
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  SPRITE-SYSTEM — sobald du echte Bilder hast, hier die Pfade
@@ -529,9 +548,11 @@ function rollShoppingList(){
 }
 function groceryById(id){return GROCERY_ITEMS.find(g=>g.id===id);}
 
-// 🍳 Rezepte — needs = benötigte Zutaten-IDs (müssen im Kühlschrank sein).
-// ruehrei/toast/pizza_backen sind von Anfang an bekannt, der Rest wird
-// beim erfolgreichen Kochen zufällig freigeschaltet (siehe cookRecipe()).
+// 🍳 Rezepte — needs = benötigte Zutaten-IDs (müssen im Kühlschrank sein,
+// für 2 Portionen jeweils doppelt). ruehrei/toast/pizza_backen sind von
+// Anfang an bekannt (Standardrezepte), der Rest sind Geheimrezepte, die
+// automatisch freigeschaltet werden, sobald alle Zutaten im Kühlschrank
+// liegen (siehe checkRecipeUnlocks()).
 const RECIPES=[
   {id:'ruehrei',icon:'🍳',name:'Rührei',needs:['eier','butter']},
   {id:'toast',icon:'🍞',name:'Toast mit Marmelade',needs:['brot','marmelade','butter']},
@@ -545,26 +566,41 @@ const RECIPES=[
   {id:'kaesebrot',icon:'🧀',name:'Käsebrot',needs:['brot','kaese','butter']},
 ];
 function recipeById(id){return RECIPES.find(r=>r.id===id);}
-function canCook(recipe){return recipe.needs.every(id=>GS.fridge.includes(id));}
+// servings: 1 (nur für eine Person) oder 2 (für beide) — kostet dann die doppelte Zutatenmenge.
+function canCook(recipe,servings=1){return recipe.needs.every(id=>fridgeHas(id,servings));}
 
-// Kocht ein Gericht: verbraucht die Zutaten, mit Chance ein neues Rezept
-// freizuschalten. Gibt einen Flavor-Text zurück.
-function cookRecipe(recipeId){
-  const recipe=recipeById(recipeId);
-  if(!recipe||!canCook(recipe))return null;
-  recipe.needs.forEach(id=>{
-    const idx=GS.fridge.indexOf(id);
-    if(idx>-1)GS.fridge.splice(idx,1);
+// 🔓 Geheime Rezepte: sobald alle Zutaten eines noch unbekannten Rezepts im
+// Kühlschrank liegen (aus dem Supermarkt besorgt), wird es automatisch freigeschaltet.
+// Wird nach dem Einkaufen (Kasse) und nach dem Kochen aufgerufen.
+function checkRecipeUnlocks(scene){
+  const newly=[];
+  RECIPES.forEach(r=>{
+    if(!GS.unlockedRecipes.includes(r.id)&&canCook(r,1)){
+      GS.unlockedRecipes=[...GS.unlockedRecipes,r.id];
+      newly.push(r);
+    }
   });
-  let unlockMsg='';
-  const locked=RECIPES.filter(r=>!GS.unlockedRecipes.includes(r.id));
-  if(locked.length&&Math.random()<0.4){
-    const pick=locked[Math.floor(Math.random()*locked.length)];
-    GS.unlockedRecipes=[...GS.unlockedRecipes,pick.id];
-    unlockMsg=` Dabei hast du improvisiert — neues Rezept entdeckt: ${pick.icon} ${pick.name}!`;
+  if(newly.length){
+    saveGame();
+    if(scene){
+      const names=newly.map(r=>`${r.icon} ${r.name}`).join(', ');
+      scene.openItemMsg(GW/2,GH/2-40,`🔓 Neues Rezept entdeckt: ${names}!`);
+    }
   }
+  return newly;
+}
+
+// Kocht ein Gericht für 1 oder 2 Personen: verbraucht die (ggf. doppelte)
+// Zutatenmenge und füllt den Hunger-State der Esser wieder auf.
+function cookRecipe(recipeId,servings=1,eaters){
+  const recipe=recipeById(recipeId);
+  if(!recipe||!canCook(recipe,servings))return null;
+  recipe.needs.forEach(id=>fridgeRemove(id,servings));
+  const who=eaters||(servings>=2?['ich','freundin']:['ich']);
+  GS.feedHumans(who,100);
   saveGame();
-  return `${recipe.icon} ${recipe.name} ist fertig! 😋${unlockMsg}`;
+  const wer=who.map(k=>NPCS[k]?.name||k).join(' & ');
+  return `${recipe.icon} ${recipe.name} ist fertig! 😋 (für ${wer})`;
 }
 
 // 🍳 Rezept-Auswahl-Panel — öffnet sich beim Klick auf den Herd.
@@ -572,39 +608,63 @@ function cookRecipe(recipeId){
 // sind grün, fehlende Zutaten werden aufgelistet.
 function openRecipePanel(scene){
   if(scene._recipePanel)return; // schon offen
+  const unlocked=RECIPES.filter(r=>GS.unlockedRecipes.includes(r.id));
+  const pw=560,rowH=46,headerH=58;
+  const ph=Math.min(headerH+unlocked.length*rowH+16,GH-32);
+  const px=GW/2-pw/2,py=GH/2-ph/2;
   const group=[];
-  const pw=520,ph=380,px=GW/2-pw/2,py=GH/2-ph/2;
   const bg=scene.add.graphics().setDepth(900);
   bg.fillStyle(0x1A1228,0.97);bg.fillRoundedRect(px,py,pw,ph,12);
   bg.lineStyle(2,0x5A4890,1);bg.strokeRoundedRect(px,py,pw,ph,12);
   group.push(bg);
-  group.push(scene.add.text(GW/2,py+22,'🍳 Was wollen wir kochen?',{fontSize:'16px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#F0E8FF'}).setOrigin(0.5).setDepth(901));
+  group.push(scene.add.text(GW/2,py+20,'🍳 Was wollen wir kochen?',{fontSize:'16px',fontFamily:'"Arial Black",Arial',fontStyle:'bold',color:'#F0E8FF'}).setOrigin(0.5).setDepth(901));
+  group.push(scene.add.text(GW/2,py+40,'Zutaten müssen im Kühlschrank sein · für 2 Personen braucht es die doppelte Menge',{fontSize:'9px',fontFamily:'Arial',color:'#A090C0'}).setOrigin(0.5).setDepth(901));
   const closeTxt=scene.add.text(px+pw-22,py+18,'✖',{fontSize:'16px',fontFamily:'Arial',color:'#C8B8E0'}).setOrigin(0.5).setDepth(902).setInteractive({cursor:'pointer'});
   closeTxt.on('pointerdown',()=>closePanel());
   group.push(closeTxt);
 
-  const rowH=42,listY=py+52;
-  RECIPES.filter(r=>GS.unlockedRecipes.includes(r.id)).forEach((recipe,i)=>{
+  const listY=py+headerH;
+  const doCook=(recipe,servings)=>{
+    const msg=cookRecipe(recipe.id,servings);
+    closePanel();
+    if(msg)scene.openItemMsg(GW/2,GH/2-40,msg);
+    checkRecipeUnlocks(scene);
+  };
+  const mkServeBtn=(cx,cy,label,enabled,onClick)=>{
+    const bw=54,bh=30;
+    const bbg=scene.add.graphics().setDepth(901);
+    bbg.fillStyle(enabled?0x2A5A28:0x2A2430,0.95);bbg.fillRoundedRect(cx-bw/2,cy-bh/2,bw,bh,6);
+    bbg.lineStyle(1.3,enabled?0x5AC040:0x4A4054,0.9);bbg.strokeRoundedRect(cx-bw/2,cy-bh/2,bw,bh,6);
+    group.push(bbg);
+    group.push(scene.add.text(cx,cy,label,{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:enabled?'#C0F0B0':'#807888'}).setOrigin(0.5).setDepth(902));
+    const z=scene.add.zone(cx,cy,bw,bh).setOrigin(0.5).setInteractive({cursor:'pointer'}).setDepth(905);
+    z.on('pointerdown',onClick);
+    group.push(z);
+  };
+
+  unlocked.forEach((recipe,i)=>{
     const ry=listY+i*rowH;
-    const ok=canCook(recipe);
+    const ok1=canCook(recipe,1),ok2=canCook(recipe,2);
     const rowBg=scene.add.graphics().setDepth(900);
-    rowBg.fillStyle(ok?0x2A4A28:0x2A2032,0.9);rowBg.fillRoundedRect(px+16,ry,pw-32,rowH-6,6);
-    if(ok){rowBg.lineStyle(1.5,0x5AA040,0.9);rowBg.strokeRoundedRect(px+16,ry,pw-32,rowH-6,6);}
+    rowBg.fillStyle(ok1?0x2A4A28:0x2A2032,0.9);rowBg.fillRoundedRect(px+16,ry,pw-32,rowH-6,6);
+    if(ok1){rowBg.lineStyle(1.5,0x5AA040,0.9);rowBg.strokeRoundedRect(px+16,ry,pw-32,rowH-6,6);}
     group.push(rowBg);
-    group.push(scene.add.text(px+30,ry+(rowH-6)/2,`${recipe.icon} ${recipe.name}`,{fontSize:'13px',fontFamily:'Arial',fontStyle:'bold',color:'#F0E8FF'}).setOrigin(0,0.5).setDepth(901));
-    if(!ok){
-      const missing=recipe.needs.filter(id=>!GS.fridge.includes(id)).map(id=>groceryById(id)?.name).join(', ');
-      group.push(scene.add.text(px+pw-30,ry+(rowH-6)/2,`fehlt: ${missing}`,{fontSize:'10px',fontFamily:'Arial',color:'#C89090'}).setOrigin(1,0.5).setDepth(901));
+    const cy=ry+(rowH-6)/2;
+    group.push(scene.add.text(px+30,cy,`${recipe.icon} ${recipe.name}`,{fontSize:'13px',fontFamily:'Arial',fontStyle:'bold',color:'#F0E8FF'}).setOrigin(0,0.5).setDepth(901));
+    if(!ok1){
+      const missing=recipe.needs.filter(id=>!fridgeHas(id,1)).map(id=>groceryById(id)?.name).join(', ');
+      group.push(scene.add.text(px+pw-30,cy,`fehlt: ${missing}`,{fontSize:'10px',fontFamily:'Arial',color:'#C89090'}).setOrigin(1,0.5).setDepth(901));
     }else{
-      group.push(scene.add.text(px+pw-30,ry+(rowH-6)/2,'kochen ▶',{fontSize:'11px',fontFamily:'Arial',fontStyle:'bold',color:'#90E080'}).setOrigin(1,0.5).setDepth(901));
+      mkServeBtn(px+pw-108,cy,'1 👤',true,()=>doCook(recipe,1));
+      mkServeBtn(px+pw-46,cy,'2 👥',ok2,()=>{
+        if(!ok2){
+          const missing2=recipe.needs.filter(id=>!fridgeHas(id,2)).map(id=>groceryById(id)?.name).join(', ');
+          scene.openItemMsg(GW/2,GH/2-40,`Für 2 Personen fehlt noch: ${missing2}`);
+          return;
+        }
+        doCook(recipe,2);
+      });
     }
-    const zone=scene.add.zone(px+pw/2,ry+(rowH-6)/2,pw-32,rowH-6).setOrigin(0.5).setInteractive({cursor:ok?'pointer':'default'}).setDepth(905);
-    if(ok)zone.on('pointerdown',()=>{
-      const msg=cookRecipe(recipe.id);
-      closePanel();
-      scene.openItemMsg(GW/2,GH/2-40,msg);
-    });
-    group.push(zone);
   });
 
   const closePanel=()=>{group.forEach(o=>o.destroy());scene._recipePanel=null;};
@@ -1167,7 +1227,7 @@ class Wohnzimmer extends BaseRoom{
       const img=this.add.image(p.x,p.y,key).setOrigin(0.5,1).setFlipX(!!flip).setDepth(FDEPTH(wx,wy));
       img.setScale((SPRITE_TARGET_H[key]||105)/img.height);
     };
-    chair('stuhl_l', TWX+TSW+0.70, TWY+TSD/2,  true); // lange vordere Kante, mittig
+    chair('stuhl_l', TWX+TSW+0.70, TWY+TSD/2,  true);  // lange vordere Kante, mittig
     chair('stuhl_r', TWX+TSW/2,    TWY-0.62,    false); // kurze Kante bei der Tür (hintere/kleinere y-Seite), mittig, gespiegelt
     if(!loadedSprites.has('stuhl')&&!loadedSprites.has('stuhl_v')){
     }else{
@@ -1232,8 +1292,9 @@ class Kueche extends BaseRoom{
     fridgeZone.on('pointerdown',()=>{
       this._npcClick=true;
       if(this.activeDialog)this.closeDialog();
-      if(!GS.fridge.length){this.openItemMsg(fridgeSc.x,fridgeSc.y-50,'Der Kühlschrank ist leer — Zeit zum Einkaufen! 🛒');return;}
-      const names=GS.fridge.map(id=>groceryById(id)?.name).filter(Boolean).join(', ');
+      const entries=Object.entries(GS.fridge||{});
+      if(!entries.length){this.openItemMsg(fridgeSc.x,fridgeSc.y-50,'Der Kühlschrank ist leer — Zeit zum Einkaufen! 🛒');return;}
+      const names=entries.map(([id,qty])=>{const g=groceryById(id);return g?`${g.name}${qty>1?' x'+qty:''}`:null;}).filter(Boolean).join(', ');
       this.openItemMsg(fridgeSc.x,fridgeSc.y-50,`Im Kühlschrank: ${names}`);
     });
     box(g,1.5,0,0.88,1.5,0.8,0.08,C.KT_ST,C.KT_STF,C.KT_STT);
@@ -1774,13 +1835,20 @@ function placeCheckout(scene,g,wx,wy){
       return;
     }
     const quest=QUESTS.einkaufen;
-    GS.fridge=[...new Set([...GS.fridge,...GS.cart])]; // gekaufte Sachen wandern in den Kühlschrank
+    GS.cart.forEach(id=>fridgeAdd(id,1)); // gekaufte Sachen wandern in den Kühlschrank
     if(GS.quests.active==='einkaufen')quest.complete(GS);
     else{GS.shoppingList=[];GS.cart=[];saveGame();}
     scene.openItemMsg(sc.x,sc.y-40,quest.rewardText);
+    const newlyUnlocked=checkRecipeUnlocks(); // Geheimrezepte checken, Toast erst nach der Belohnungsmeldung
     scene.time.delayedCall(1800,()=>{
-      scene.cameras.main.fadeOut(200,10,8,18);
-      scene.cameras.main.once('camerafadeoutcomplete',()=>{GS.room='flur';scene.scene.start(SMAP['flur']);});
+      if(newlyUnlocked.length){
+        const names=newlyUnlocked.map(r=>`${r.icon} ${r.name}`).join(', ');
+        scene.openItemMsg(sc.x,sc.y-40,`🔓 Neues Rezept entdeckt: ${names}!`);
+      }
+      scene.time.delayedCall(newlyUnlocked.length?1800:0,()=>{
+        scene.cameras.main.fadeOut(200,10,8,18);
+        scene.cameras.main.once('camerafadeoutcomplete',()=>{GS.room='flur';scene.scene.start(SMAP['flur']);});
+      });
     });
   });
 }
@@ -1915,7 +1983,13 @@ function loadGame(){
     if(data.kellerUnlocked)GS.kellerUnlocked=data.kellerUnlocked;
     if(data.shoppingList)GS.shoppingList=data.shoppingList;
     if(data.cart)GS.cart=data.cart;
-    if(data.fridge)GS.fridge=data.fridge;
+    if(data.fridge){
+      if(Array.isArray(data.fridge)){ // altes Speicherformat (Liste ohne Mengen) migrieren
+        const obj={};data.fridge.forEach(id=>{obj[id]=(obj[id]||0)+1;});GS.fridge=obj;
+      }else GS.fridge=data.fridge;
+    }
+    if(GS.hunger.ich===undefined)GS.hunger.ich=100;
+    if(GS.hunger.freundin===undefined)GS.hunger.freundin=100;
     if(data.unlockedRecipes)GS.unlockedRecipes=data.unlockedRecipes;
     return true;
   }catch(e){return false;}
@@ -1988,8 +2062,9 @@ class StartScreen extends Phaser.Scene{
     mkBtn(GH*0.56,'\u25b6 Fortsetzen',has,()=>{loadGame();GS.recalc();goToGame();});
     mkBtn(GH*0.70,'\u2728 Neues Spiel',true,()=>{
       clearSave();
-      GS.hunger={katze1:20,katze2:20};
+      GS.hunger={katze1:20,katze2:20,ich:100,freundin:100};
       GS.quests={active:null,completed:[],lastOffered:{}};
+      GS.fridge={};GS.shoppingList=[];GS.cart=[];GS.unlockedRecipes=['ruehrei','toast','pizza_backen'];
       GS.room='schlafzimmer';GS.override=null;GS.placements=null;
       GS.recalc();
       goToGame();
@@ -2002,8 +2077,42 @@ class StartScreen extends Phaser.Scene{
 
 class UI extends Phaser.Scene{
   constructor(){super({key:'UI',active:false});}
-  create(){this.scene.bringToTop('UI');this.clk=this.add.text(GW-12,10,'',{fontSize:'13px',fontFamily:'Arial',color:'#C8B8E0',backgroundColor:'#1A122899',padding:{x:7,y:4}}).setOrigin(1,0).setDepth(1000);this.time.addEvent({delay:1000,callback:this.tick,callbackScope:this,loop:true});this.time.addEvent({delay:15000,callback:()=>{GS.tickHunger(4);GS.tickDirtiness(3);saveGame();},loop:true});this.tick();}
-  tick(){const n=new Date();this.clk.setText('\ud83d\udd50 '+String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'));}
+  create(){
+    this.scene.bringToTop('UI');
+    this.clk=this.add.text(GW-12,10,'',{fontSize:'13px',fontFamily:'Arial',color:'#C8B8E0',backgroundColor:'#1A122899',padding:{x:7,y:4}}).setOrigin(1,0).setDepth(1000);
+    this.hungerBars=this.buildHungerHUD();
+    this.time.addEvent({delay:1000,callback:this.tick,callbackScope:this,loop:true});
+    this.time.addEvent({delay:15000,callback:()=>{GS.tickHunger(4);GS.tickDirtiness(3);saveGame();},loop:true});
+    this.tick();
+  }
+  // 🍽️ Hunger-HUD: je eine Leiste für Ich & Schatz, oben links, immer sichtbar.
+  buildHungerHUD(){
+    const keys=['ich','freundin'];
+    const bars={};
+    keys.forEach((k,i)=>{
+      const x=12,y=10+i*26,w=112,h=18;
+      const bg=this.add.graphics().setDepth(1000);
+      const label=this.add.text(x+6,y+h/2,'',{fontSize:'10px',fontFamily:'Arial',fontStyle:'bold',color:'#FFFFFF'}).setOrigin(0,0.5).setDepth(1002);
+      bars[k]={bg,label,x,y,w,h};
+    });
+    return bars;
+  }
+  drawHungerBar(k){
+    const b=this.hungerBars[k];if(!b)return;
+    const val=Math.max(0,Math.min(100,GS.hunger[k]??100));
+    const name=NPCS[k]?.name||k;
+    const color=val>50?0x5AA040:(val>20?0xD0A030:0xC04040);
+    b.bg.clear();
+    b.bg.fillStyle(0x1A1228,0.85);b.bg.fillRoundedRect(b.x,b.y,b.w,b.h,5);
+    b.bg.fillStyle(color,0.95);b.bg.fillRoundedRect(b.x,b.y,Math.max(6,b.w*val/100),b.h,5);
+    b.bg.lineStyle(1,0x5A4890,0.9);b.bg.strokeRoundedRect(b.x,b.y,b.w,b.h,5);
+    b.label.setText(`🍽️ ${name} ${Math.round(val)}%`);
+  }
+  tick(){
+    const n=new Date();
+    this.clk.setText('\ud83d\udd50 '+String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'));
+    Object.keys(this.hungerBars).forEach(k=>this.drawHungerBar(k));
+  }
 }
 
 // LAUNCH
